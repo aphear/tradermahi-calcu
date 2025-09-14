@@ -32,6 +32,7 @@ interface PLSheetProps {
     totalDays: number
     isFromResults: boolean
   }
+  sheetType?: "binary" | "forex" // Added sheetType prop to distinguish between binary and forex sheets
 }
 
 interface PLEntry {
@@ -193,7 +194,7 @@ const weekDays = [
   { id: "saturday", label: "Saturday", short: "Sat" },
 ]
 
-export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
+export default function PLSheet({ onBack, prePopulatedData, sheetType = "binary" }: PLSheetProps) {
   const [selectedCurrency, setSelectedCurrency] = useState("")
   const [durationType, setDurationType] = useState("ymd")
   const [years, setYears] = useState("")
@@ -236,8 +237,8 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
         setShowResultsAlert(true)
       }
     } else {
-      // Load from localStorage as before
-      const savedPLSheet = localStorage.getItem("plSheetData")
+      const storageKey = sheetType === "forex" ? "forexPLSheetData" : "binaryPLSheetData"
+      const savedPLSheet = localStorage.getItem(storageKey)
       if (savedPLSheet) {
         try {
           const parsedData = JSON.parse(savedPLSheet)
@@ -257,7 +258,7 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
         }
       }
     }
-  }, [prePopulatedData])
+  }, [prePopulatedData, sheetType])
 
   useEffect(() => {
     if (showSheet) {
@@ -336,7 +337,8 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
       plEntries,
       showSheet,
     }
-    localStorage.setItem("plSheetData", JSON.stringify(dataToSave))
+    const storageKey = sheetType === "forex" ? "forexPLSheetData" : "binaryPLSheetData"
+    localStorage.setItem(storageKey, JSON.stringify(dataToSave))
   }
 
   const handleCreateSheet = () => {
@@ -395,7 +397,8 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
     setSelectedWeekDays(["monday", "tuesday", "wednesday", "thursday", "friday"])
     setPLEntries([])
     setShowSheet(false)
-    localStorage.removeItem("plSheetData")
+    const storageKey = sheetType === "forex" ? "forexPLSheetData" : "binaryPLSheetData"
+    localStorage.removeItem(storageKey)
   }
 
   const handleWeekDayChange = (dayId: string, checked: boolean) => {
@@ -462,13 +465,13 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
         )}
 
         <div className="flex items-center justify-center">
-          <h1 className="text-2xl font-bold">P/L Sheet</h1>
+          <h1 className="text-2xl font-bold">{sheetType === "forex" ? "Forex" : "Binary"} P/L Sheet</h1>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Profit & Loss Tracking Sheet</span>
+              <span>{sheetType === "forex" ? "Forex" : "Binary"} Profit & Loss Tracking Sheet</span>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
                   <Download className="h-4 w-4" />
@@ -483,7 +486,8 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete P/L Sheet</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this P/L sheet? This action cannot be undone.
+                        Are you sure you want to delete this {sheetType === "forex" ? "Forex" : "Binary"} P/L sheet?
+                        This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -496,6 +500,7 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* ... existing table and content code ... */}
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -577,15 +582,20 @@ export default function PLSheet({ onBack, prePopulatedData }: PLSheetProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-center">
-        <h1 className="text-2xl font-bold flex items-center gap-2">P/L Sheet</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          {sheetType === "forex" ? "Forex" : "Binary"} P/L Sheet
+        </h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create Profit & Loss Sheet</CardTitle>
-          <CardDescription>Set up your P/L tracking sheet with custom parameters</CardDescription>
+          <CardTitle>Create {sheetType === "forex" ? "Forex" : "Binary"} Profit & Loss Sheet</CardTitle>
+          <CardDescription>
+            Set up your {sheetType === "forex" ? "Forex" : "Binary"} P/L tracking sheet with custom parameters
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* ... existing form content ... */}
           {/* Currency Selection */}
           <div className="space-y-2">
             <Label htmlFor="currency">Select Currency *</Label>

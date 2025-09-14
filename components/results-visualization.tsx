@@ -388,6 +388,7 @@ export default function ResultsVisualization({
       })),
       totalDays: chartData.length,
       isFromResults: true, // Flag to show popup
+      type: "binary" as const, // Mark as binary type
     }
 
     onCreateSheet(sheetData)

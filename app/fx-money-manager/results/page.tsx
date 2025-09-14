@@ -748,9 +748,9 @@ export default function ResultsPage() {
       entries: plEntries,
       totalDays: results.trades.length,
       isFromResults: true,
+      type: "forex" as const, // Mark as forex type
     }
 
-    // Store sheet data in localStorage for the homepage P/L Sheet
     localStorage.setItem(
       "plSheetData",
       JSON.stringify({

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Menu, Calculator, TrendingUp, BarChart3, Table, Send, Clock, Brain, DollarSign, Languages } from "lucide-react"
 import TradingCalculatorForm from "@/components/trading-calculator-form"
 import ResultsVisualization from "@/components/results-visualization"
-import PLSheet from "@/components/pl-sheet"
+import PLSheetSelector from "@/components/pl-sheet-selector"
 import { useRouter } from "next/navigation"
 
 interface TradingDashboardProps {
@@ -716,7 +716,7 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
 
         {activeTab === "plsheet" && (
           <div>
-            <PLSheet onBack={() => setActiveTab("results")} prePopulatedData={plSheetData} />
+            <PLSheetSelector onBack={() => setActiveTab("results")} prePopulatedData={plSheetData} />
           </div>
         )}
 
