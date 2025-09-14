@@ -10,7 +10,7 @@ import { Menu, Calculator, TrendingUp, BarChart3, Table, Send, Clock, Brain, Dol
 import TradingCalculatorForm from "@/components/trading-calculator-form"
 import ResultsVisualization from "@/components/results-visualization"
 import PLSheetSelector from "@/components/pl-sheet-selector"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface TradingDashboardProps {
   onLogout: () => void
@@ -30,9 +30,33 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
   const session = sessionUtils.getSession()
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     setIsClient(true)
+
+    const view = searchParams.get("view")
+    const type = searchParams.get("type")
+
+    if (view === "pl-sheet") {
+      setActiveTab("plsheet")
+
+      // Load pre-populated data based on type
+      if (type === "forex") {
+        const forexData = localStorage.getItem("forexPLSheetData")
+        if (forexData) {
+          try {
+            const parsedData = JSON.parse(forexData)
+            if (parsedData.prePopulatedData) {
+              setPLSheetData(parsedData.prePopulatedData)
+            }
+          } catch (error) {
+            console.error("Error loading forex P/L sheet data:", error)
+          }
+        }
+      }
+    }
+
     const savedResults = localStorage.getItem("tradingCalculatorResults")
     if (savedResults) {
       try {
@@ -53,7 +77,7 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
         console.error("Error loading saved FX results:", error)
       }
     }
-  }, [])
+  }, [searchParams])
 
   const handleLogout = () => {
     sessionUtils.clearSession()
@@ -103,6 +127,13 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
       setPLSheetData(null)
     }
     setActiveTab(tabId)
+
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      url.searchParams.delete("view")
+      url.searchParams.delete("type")
+      window.history.replaceState({}, "", url.toString())
+    }
   }
 
   const exportToCSV = () => {
@@ -562,7 +593,7 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
                     <div className="px-4 py-3 border-b border-primary/20">
                       <div className="flex items-center gap-2 mb-2">
                         <Languages className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium text-foreground">{t.language} / ভাষা / भाषा</span>
+                        <span className="text-sm font-medium text-foreground">{t.language} / ভাষা / ভাষা</span>
                       </div>
                       <div className="space-y-1">
                         <button

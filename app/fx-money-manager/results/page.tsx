@@ -752,7 +752,7 @@ export default function ResultsPage() {
     }
 
     localStorage.setItem(
-      "plSheetData",
+      "forexPLSheetData",
       JSON.stringify({
         selectedCurrency: fxData.currency,
         plEntries,
@@ -761,11 +761,10 @@ export default function ResultsPage() {
       }),
     )
 
-    // Show alert
     alert("You're Sheet Create On Your Fx Result, You Can Edit Losses")
 
-    // Redirect to homepage P/L Sheet
-    router.push("/?tab=plsheet")
+    // Navigate to P/L Sheet with forex type
+    window.location.href = "/trading-dashboard?view=pl-sheet&type=forex"
   }
 
   if (isLoading) {
