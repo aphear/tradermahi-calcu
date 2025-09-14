@@ -75,7 +75,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
       console.log("[v0] Loading admin data via API...")
       const response = await fetch("/api/admin/users", {
         headers: {
-          "admin-password": "admin123",
+          "admin-password": "TMXCALCU",
         },
       })
 
@@ -151,7 +151,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adminPassword: "admin123",
+          adminPassword: "TMXCALCU",
           type: newKeyData.type,
           expiryDate: newKeyData.expiryDate || undefined,
           keyMode: newKeyData.keyMode,
@@ -194,7 +194,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adminPassword: "admin123",
+          adminPassword: "TMXCALCU",
           action: "ban",
           username,
         }),
@@ -226,7 +226,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adminPassword: "admin123",
+          adminPassword: "TMXCALCU",
           action: "unban",
           username,
         }),
@@ -258,7 +258,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adminPassword: "admin123",
+          adminPassword: "TMXCALCU",
           action: "delete",
           username,
         }),
@@ -290,7 +290,7 @@ export default function AdminPanel({ currentLanguage }: AdminPanelProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          adminPassword: "admin123",
+          adminPassword: "TMXCALCU",
           key,
         }),
       })

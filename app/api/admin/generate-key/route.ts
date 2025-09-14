@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       hasPassword: !!adminPassword,
     })
 
-    if (adminPassword !== "admin123") {
+    if (adminPassword !== "TMXCALCU") {
       console.log("[v0] Unauthorized access attempt")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

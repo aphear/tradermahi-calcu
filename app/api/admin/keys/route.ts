@@ -5,7 +5,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { adminPassword, key } = await request.json()
 
-    if (adminPassword !== "admin123") {
+    if (adminPassword !== "TMXCALCU") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

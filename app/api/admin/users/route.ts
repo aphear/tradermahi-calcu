@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     const adminPassword = request.headers.get("admin-password")
 
-    if (adminPassword !== "admin123") {
+    if (adminPassword !== "TMXCALCU") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     const { adminPassword, action, username } = await request.json()
 
-    if (adminPassword !== "admin123") {
+    if (adminPassword !== "TMXCALCU") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

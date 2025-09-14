@@ -20,7 +20,7 @@ export default function AdminPage() {
   const { toast } = useToast()
 
   // Admin password (in production, this should be more secure)
-  const ADMIN_PASSWORD = "admin123"
+  const ADMIN_PASSWORD = "TMXCALCU"
 
   useEffect(() => {
     // Check if already authenticated in session
