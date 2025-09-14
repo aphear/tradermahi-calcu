@@ -1052,7 +1052,7 @@ export default function ResultsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {results?.trades.slice(0, 10).map((trade, index) => {
+                      {results?.trades.map((trade, index) => {
                         const targetProfit = trade.dailyProfit
 
                         // For small profits (< $50): 2-3 trades, smaller lots, more pips
