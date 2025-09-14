@@ -761,18 +761,10 @@ export default function ResultsPage() {
       }),
     )
 
-    alert("You're Forex Sheet Was Created , On P/L Forex Sheet Under Check Now")
+    alert("You're Fx Result Sheet Creat On P/L Forex Sheet , Check Now")
 
-    // Navigate to trading dashboard and then to P/L Sheet
-    window.location.href = "/trading-dashboard"
-
-    // Set a timeout to navigate to P/L Sheet after the page loads
-    setTimeout(() => {
-      const event = new CustomEvent("navigateToPLSheet", {
-        detail: { type: "forex" },
-      })
-      window.dispatchEvent(event)
-    }, 100)
+    // Navigate to home page instead of trading dashboard to avoid 404
+    window.location.href = "/"
   }
 
   if (isLoading) {
