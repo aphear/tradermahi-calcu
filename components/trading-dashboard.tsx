@@ -57,6 +57,27 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
       }
     }
 
+    const handleNavigateToPLSheet = (event: CustomEvent) => {
+      const { type } = event.detail
+      setActiveTab("plsheet")
+
+      if (type === "forex") {
+        const forexData = localStorage.getItem("forexPLSheetData")
+        if (forexData) {
+          try {
+            const parsedData = JSON.parse(forexData)
+            if (parsedData.prePopulatedData) {
+              setPLSheetData(parsedData.prePopulatedData)
+            }
+          } catch (error) {
+            console.error("Error loading forex P/L sheet data:", error)
+          }
+        }
+      }
+    }
+
+    window.addEventListener("navigateToPLSheet", handleNavigateToPLSheet as EventListener)
+
     const savedResults = localStorage.getItem("tradingCalculatorResults")
     if (savedResults) {
       try {
@@ -76,6 +97,10 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
       } catch (error) {
         console.error("Error loading saved FX results:", error)
       }
+    }
+
+    return () => {
+      window.removeEventListener("navigateToPLSheet", handleNavigateToPLSheet as EventListener)
     }
   }, [searchParams])
 

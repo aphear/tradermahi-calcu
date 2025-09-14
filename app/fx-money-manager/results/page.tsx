@@ -761,10 +761,18 @@ export default function ResultsPage() {
       }),
     )
 
-    alert("You're Sheet Create On Your Fx Result, You Can Edit Losses")
+    alert("You're Forex Sheet Was Created , On P/L Forex Sheet Under Check Now")
 
-    // Navigate to P/L Sheet with forex type
-    window.location.href = "/trading-dashboard?view=pl-sheet&type=forex"
+    // Navigate to trading dashboard and then to P/L Sheet
+    window.location.href = "/trading-dashboard"
+
+    // Set a timeout to navigate to P/L Sheet after the page loads
+    setTimeout(() => {
+      const event = new CustomEvent("navigateToPLSheet", {
+        detail: { type: "forex" },
+      })
+      window.dispatchEvent(event)
+    }, 100)
   }
 
   if (isLoading) {
