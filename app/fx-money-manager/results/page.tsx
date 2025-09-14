@@ -221,7 +221,7 @@ export default function ResultsPage() {
               riskPercentage: Number(parsedData.riskPercentage) || 2,
               winRate: Number(parsedData.winRate) || 60,
               riskRewardRatio: Number(parsedData.riskRewardRatio) || 2,
-              tradingDays: Number(parsedData.tradingDays) || 30,
+              tradingDays: Number(parsedData.totalDays) || Number(parsedData.tradingDays) || 30,
               startDate: parsedData.startDate,
               endDate: parsedData.endDate,
               interestType: parsedData.interestType || "low",
@@ -716,7 +716,7 @@ export default function ResultsPage() {
 
   const sortedData = getAggregatedData().sort((a, b) => {
     const aValue = a[sortColumn as keyof typeof a]
-    const bValue = b[sortColumn as keyof typeof b]
+    const bValue = b[sortColumn as keyof typeof a]
 
     if (typeof aValue === "number" && typeof bValue === "number") {
       return sortDirection === "asc" ? aValue - bValue : bValue - aValue
