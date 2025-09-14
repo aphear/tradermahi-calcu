@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { format } from "date-fns"
-import { Trash2, Download } from "lucide-react"
+import { Trash2, Download, ArrowLeft } from "lucide-react"
 
 interface PLSheetProps {
   onBack: () => void
@@ -464,8 +464,13 @@ export default function PLSheet({ onBack, prePopulatedData, sheetType = "binary"
           </AlertDialog>
         )}
 
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={onBack} className="flex items-center gap-2 bg-transparent">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
           <h1 className="text-2xl font-bold">{sheetType === "forex" ? "Forex" : "Binary"} P/L Sheet</h1>
+          <div></div>
         </div>
 
         <Card>
@@ -581,10 +586,15 @@ export default function PLSheet({ onBack, prePopulatedData, sheetType = "binary"
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-between">
+        <Button variant="outline" onClick={onBack} className="flex items-center gap-2 bg-transparent">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           {sheetType === "forex" ? "Forex" : "Binary"} P/L Sheet
         </h1>
+        <div></div>
       </div>
 
       <Card>

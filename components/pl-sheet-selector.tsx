@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, DollarSign, ArrowLeft } from "lucide-react"
+import { TrendingUp, DollarSign } from "lucide-react"
 import PLSheet from "@/components/pl-sheet"
 
 interface PLSheetSelectorProps {
@@ -45,13 +45,8 @@ export default function PLSheetSelector({ onBack, prePopulatedData }: PLSheetSel
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack} className="flex items-center gap-2 bg-transparent">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
+      <div className="flex items-center justify-center">
         <h1 className="text-2xl font-bold">P/L Sheet</h1>
-        <div></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
