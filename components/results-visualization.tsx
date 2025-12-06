@@ -577,11 +577,6 @@ export default function ResultsVisualization({
               <TabsContent key={view} value={view} className="space-y-6 mt-6">
                 {/* Profit Growth Chart */}
                 <Card className="bg-muted/30">
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Capital Growth - {view.charAt(0).toUpperCase() + view.slice(1)} View
-                    </CardTitle>
-                  </CardHeader>
                   <CardContent>
                     <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
