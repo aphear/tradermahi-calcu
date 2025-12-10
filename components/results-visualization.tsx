@@ -306,11 +306,19 @@ export default function ResultsVisualization({
     ]
 
     if (results.hasStopLoss) {
-      baseData.push({
-        metric: "Per-Day Stop Loss (if active)",
-        value: `${results.currency || "$"} ${safeNumber(results.stopLossAmount).toLocaleString()}`,
-        type: "negative",
-      })
+      if (results.stopLossType === "percentage") {
+        baseData.push({
+          metric: "Per-Day Stop Loss (if active)",
+          value: `${safeNumber(results.stopLossValue)}%`,
+          type: "negative",
+        })
+      } else if (results.stopLossType === "fixed") {
+        baseData.push({
+          metric: "Per-Day Stop Loss (if active)",
+          value: `${results.currency || "$"} ${safeNumber(results.stopLossAmount).toLocaleString()}`,
+          type: "negative",
+        })
+      }
     }
 
     if (results.hasDailyTrades) {

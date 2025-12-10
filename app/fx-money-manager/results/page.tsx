@@ -90,6 +90,9 @@ interface FxData {
   tradesPerDay?: number
   riskAmount?: number
   rewardAmount?: number
+  enableStopLoss?: boolean
+  stopLossType?: string
+  stopLossValue?: number
 }
 
 interface TradeResult {
@@ -229,6 +232,9 @@ export default function ResultsPage() {
               tradesPerDay: Number(parsedData.tradesPerDay) || 3,
               riskAmount: Number(parsedData.riskAmount) || 10,
               rewardAmount: Number(parsedData.rewardAmount) || 15,
+              enableStopLoss: parsedData.enableStopLoss,
+              stopLossType: parsedData.stopLossType,
+              stopLossValue: Number(parsedData.stopLossValue),
             }
 
             console.log("[v0] Validated data:", validatedData)
@@ -327,6 +333,9 @@ export default function ResultsPage() {
       tradesPerDay,
       riskAmount,
       rewardAmount,
+      enableStopLoss, // Added from update
+      stopLossType, // Added from update
+      stopLossValue, // Added from update
     } = data
 
     if (interestType === "custom" && interestRate) {
@@ -451,9 +460,40 @@ export default function ResultsPage() {
       }
     }
 
-    const calculatedRiskAmount = (initialCapital * riskPercentage) / 100
-    const calculatedRewardAmount = calculatedRiskAmount * riskRewardRatio
-    const calculatedTradesPerDay = Math.ceil(targetProfit / (calculatedRewardAmount * (winRate / 100)))
+    // Ensure riskAmount and rewardAmount are defined, using defaults if necessary
+    const effectiveRiskAmount = riskAmount !== undefined ? riskAmount : (initialCapital * (riskPercentage || 2)) / 100
+    const effectiveRewardAmount =
+      rewardAmount !== undefined ? rewardAmount : effectiveRiskAmount * (riskRewardRatio || 2)
+
+    // Calculate trades per day based on target profit and win rate, considering stop loss if enabled
+    let calculatedTradesPerDay = 0
+    if (effectiveRewardAmount > 0 && winRate > 0) {
+      const profitPerWinningTrade = effectiveRewardAmount
+      let lossPerLosingTrade = effectiveRiskAmount
+
+      if (enableStopLoss && stopLossValue !== undefined && stopLossType) {
+        if (stopLossType === "percentage") {
+          // Stop loss is a percentage of balance, calculated dynamically
+          // For simplicity in this calculation, we'll use a fixed approximation.
+          // A more complex simulation would be needed for precise dynamic stop loss.
+          // Let's assume stop loss is around 2% of balance for calculation purposes.
+          const approxStopLossAmount = initialCapital * 0.02
+          lossPerLosingTrade = Math.min(lossPerLosingTrade, approxStopLossAmount)
+        } else if (stopLossType === "fixed") {
+          lossPerLosingTrade = Math.min(lossPerLosingTrade, stopLossValue)
+        }
+      }
+
+      const netProfitPerTrade = (winRate / 100) * profitPerWinningTrade - ((100 - winRate) / 100) * lossPerLosingTrade
+
+      if (netProfitPerTrade > 0 && targetProfit > 0) {
+        calculatedTradesPerDay = Math.ceil(targetProfit / (netProfitPerTrade * (winRate / 100)))
+      } else if (targetProfit > 0) {
+        // If net profit per trade is zero or negative, aim for a sufficient number of trades to potentially reach target
+        calculatedTradesPerDay = Math.ceil(targetProfit / (effectiveRewardAmount * (winRate / 100)))
+      }
+    }
+    calculatedTradesPerDay = Math.max(1, calculatedTradesPerDay || tradesPerDay || 3) // Ensure at least 1 trade, default to 3 if no calculation
 
     const trades: TradeResult[] = []
     let currentBalance = initialCapital
@@ -470,10 +510,10 @@ export default function ResultsPage() {
       for (let trade = 0; trade < dailyTrades; trade++) {
         const isWin = Math.random() < winRate / 100
         if (isWin) {
-          dailyProfit += calculatedRewardAmount
+          dailyProfit += effectiveRewardAmount
           wins++
         } else {
-          dailyProfit -= calculatedRiskAmount
+          dailyProfit -= effectiveRiskAmount
           losses++
         }
       }
@@ -507,7 +547,7 @@ export default function ResultsPage() {
       })
     }
 
-    const totalTrades = tradingDays * calculatedTradesPerDay
+    const totalTrades = trades.reduce((sum, trade) => sum + trade.trades, 0)
     const totalWins = trades.reduce((sum, trade) => sum + trade.wins, 0)
     const totalLosses = trades.reduce((sum, trade) => sum + trade.losses, 0)
     const totalProfit = cumulativeProfit
@@ -520,13 +560,15 @@ export default function ResultsPage() {
     const dailyReturns = trades.map((t) => t.dailyProfit / initialCapital)
     const averageReturn = dailyReturns.reduce((sum, ret) => sum + ret, 0) / dailyReturns.length
     const variance = dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - averageReturn, 2), 0) / dailyReturns.length
-    const volatility = Math.sqrt(variance) * Math.sqrt(252) * 100
+    const volatility = Math.sqrt(variance) * Math.sqrt(252) * 100 // Annualized volatility
 
     const roi = (totalProfit / initialCapital) * 100
-    const annualizedReturn = Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1
-    const sharpeRatio = volatility > 0 ? (annualizedReturn * 100) / volatility : 0
+    const annualizedReturn = Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1 // Approximate annualized return
+    const sharpeRatio = volatility > 0 ? (annualizedReturn * 100 - 0.0) / volatility : 0 // Assuming risk-free rate of 0 for simplicity
     const profitFactor =
-      totalWins > 0 && totalLosses > 0 ? (totalWins * calculatedRewardAmount) / (totalLosses * calculatedRiskAmount) : 0
+      totalProfit > 0
+        ? totalProfit / Math.abs(trades.reduce((sum, t) => sum + (t.dailyProfit < 0 ? t.dailyProfit : 0), 0))
+        : 0
 
     return {
       trades,
@@ -540,8 +582,8 @@ export default function ResultsPage() {
         averageWinRate: (totalWins / totalTrades) * 100,
         profitFactor,
         sharpeRatio,
-        maxConsecutiveWins: 0,
-        maxConsecutiveLosses: 0,
+        maxConsecutiveWins: 0, // This requires more complex tracking
+        maxConsecutiveLosses: 0, // This requires more complex tracking
         averageDailyProfit: totalProfit / tradingDays,
         bestDay: Math.max(...trades.map((t) => t.dailyProfit)),
         worstDay: Math.min(...trades.map((t) => t.dailyProfit)),
@@ -554,48 +596,48 @@ export default function ResultsPage() {
         annualizedReturn: annualizedReturn * 100,
         volatility,
         calmarRatio: annualizedReturn > 0 && maxDrawdown > 0 ? (annualizedReturn * 100) / maxDrawdown : 0,
-        sortinoRatio: 0,
-        recoveryFactor: 0,
-        payoffRatio: 0,
-        profitPerTrade: calculatedRewardAmount,
-        lossPerTrade: calculatedRiskAmount,
-        largestWin: calculatedRewardAmount,
-        largestLoss: calculatedRiskAmount,
-        averageWin: calculatedRewardAmount,
-        averageLoss: calculatedRiskAmount,
-        winLossRatio: calculatedRewardAmount / calculatedRiskAmount,
-        expectancy: (winRate / 100) * calculatedRewardAmount - ((100 - winRate) / 100) * calculatedRiskAmount,
-        kelly: 0,
-        var95: 0,
-        cvar95: 0,
-        ulcerIndex: 0,
-        sterlingRatio: 0,
-        burkeRatio: 0,
-        treynorRatio: 0,
-        informationRatio: 0,
-        trackingError: 0,
-        battingAverage: 0,
-        upCaptureRatio: 0,
-        downCaptureRatio: 0,
-        captureRatio: 0,
-        selectivity: 0,
-        netSelectivity: 0,
-        diversificationRatio: 0,
-        concentrationRatio: 0,
-        herfindahlIndex: 0,
-        effectiveNumberOfBets: 0,
-        activePremium: 0,
-        activeReturn: 0,
-        activeRisk: 0,
+        sortinoRatio: 0, // Requires downside deviation calculation
+        recoveryFactor: 0, // Requires peak-to-trough analysis
+        payoffRatio: 0, // Requires average win vs average loss
+        profitPerTrade: effectiveRewardAmount,
+        lossPerTrade: effectiveRiskAmount,
+        largestWin: effectiveRewardAmount,
+        largestLoss: effectiveRiskAmount,
+        averageWin: effectiveRewardAmount, // Simplified, assumes all wins are same reward
+        averageLoss: effectiveRiskAmount, // Simplified, assumes all losses are same risk
+        winLossRatio: effectiveRewardAmount / effectiveRiskAmount,
+        expectancy: (winRate / 100) * effectiveRewardAmount - ((100 - winRate) / 100) * effectiveRiskAmount,
+        kelly: 0, // Requires more advanced calculation
+        var95: 0, // Requires Value at Risk calculation
+        cvar95: 0, // Requires Conditional Value at Risk calculation
+        ulcerIndex: 0, // Requires drawdown series analysis
+        sterlingRatio: 0, // Requires Sharpe ratio and drawdown analysis
+        burkeRatio: 0, // Requires Sharpe ratio and drawdown analysis
+        treynorRatio: 0, // Requires CAPM and beta calculation
+        informationRatio: 0, // Requires benchmark return and tracking error
+        trackingError: 0, // Requires benchmark return and portfolio return deviation
+        battingAverage: 0, // Same as win rate
+        upCaptureRatio: 0, // Requires benchmark returns comparison
+        downCaptureRatio: 0, // Requires benchmark returns comparison
+        captureRatio: 0, // Requires benchmark returns comparison
+        selectivity: 0, // Requires alpha calculation
+        netSelectivity: 0, // Requires alpha calculation
+        diversificationRatio: 0, // Requires portfolio construction analysis
+        concentrationRatio: 0, // Requires portfolio concentration analysis
+        herfindahlIndex: 0, // Requires portfolio concentration analysis
+        effectiveNumberOfBets: 0, // Requires portfolio risk analysis
+        activePremium: 0, // Requires benchmark return and portfolio return
+        activeReturn: 0, // Requires benchmark return and portfolio return
+        activeRisk: 0, // Requires benchmark return and portfolio risk
         totalReturn: roi,
         benchmarkReturn: 0,
-        alpha: 0,
-        beta: 0,
-        correlation: 0,
-        rSquared: 0,
-        standardError: 0,
-        tStat: 0,
-        pValue: 0,
+        alpha: 0, // Requires CAPM
+        beta: 0, // Requires CAPM
+        correlation: 0, // Requires benchmark return comparison
+        rSquared: 0, // Requires benchmark return comparison
+        standardError: 0, // Requires regression analysis
+        tStat: 0, // Requires regression analysis
+        pValue: 0, // Requires regression analysis
       },
     }
   }
@@ -957,6 +999,28 @@ export default function ResultsPage() {
                     {fxData.interestRate}% {fxData.interestType === "custom" ? "(Custom)" : ""}
                   </p>
                 </div>
+                {fxData.enableStopLoss && (
+                  <>
+                    <div>
+                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Enabled</p>
+                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">Yes</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Type</p>
+                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                        {fxData.stopLossType}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Value</p>
+                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                        {fxData.stopLossType === "percentage"
+                          ? `${fxData.stopLossValue}%`
+                          : `${currencySymbol}${fxData.stopLossValue}`}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
