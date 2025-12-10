@@ -6,18 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import {
-  Line,
-  LineChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Bar,
-  BarChart,
-} from "recharts"
 import { useTranslationContext } from "@/lib/translation-context"
 
 interface ResultsVisualizationProps {
@@ -576,87 +564,6 @@ export default function ResultsVisualization({
             {["daily", "weekly", "monthly", "yearly"].map((view) => (
               <TabsContent key={view} value={view} className="space-y-6 mt-6">
                 {/* Profit Growth Chart */}
-                <Card className="bg-muted/30">
-                  <CardContent>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                          <XAxis dataKey="period" stroke="#8b949e" fontSize={12} />
-                          <YAxis
-                            stroke="#8b949e"
-                            fontSize={12}
-                            tickFormatter={(value) => `${results.currency || "$"} ${value.toLocaleString()}`}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#161b22",
-                              border: "1px solid #00aaff",
-                              borderRadius: "8px",
-                              color: "#f0f6fc",
-                            }}
-                            formatter={(value: any, name: string) => [
-                              name === "capital"
-                                ? `${results.currency || "$"} ${value.toLocaleString()}`
-                                : value.toLocaleString(),
-                              name === "capital"
-                                ? "Total Capital"
-                                : name === "profit"
-                                  ? "Cumulative Profit"
-                                  : "Total Trades",
-                            ]}
-                          />
-                          <Legend />
-                          <Line
-                            type="monotone"
-                            dataKey="capital"
-                            stroke="#00aaff"
-                            strokeWidth={3}
-                            dot={{ fill: "#00aaff", strokeWidth: 2, r: 4 }}
-                            activeDot={{ r: 6, stroke: "#00aaff", strokeWidth: 2 }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="profit"
-                            stroke="#00ff99"
-                            strokeWidth={2}
-                            dot={{ fill: "#00ff99", strokeWidth: 2, r: 3 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Trades Volume Chart */}
-                <Card className="bg-muted/30">
-                  <CardHeader>
-                    <CardTitle className="text-lg">
-                      Trading Volume - {view.charAt(0).toUpperCase() + view.slice(1)} View
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-60">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                          <XAxis dataKey="period" stroke="#8b949e" fontSize={12} />
-                          <YAxis stroke="#8b949e" fontSize={12} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#161b22",
-                              border: "1px solid #00aaff",
-                              borderRadius: "8px",
-                              color: "#f0f6fc",
-                            }}
-                            formatter={(value: any) => [value.toLocaleString(), "Trades"]}
-                          />
-                          <Bar dataKey="trades" fill="#00aaff" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
 
                 <Card className="bg-muted/30">
                   <CardHeader>
