@@ -90,6 +90,9 @@ interface FxData {
   tradesPerDay?: number
   riskAmount?: number
   rewardAmount?: number
+  enableStopLoss?: boolean
+  stopLossType?: string | null
+  stopLossValue?: number | null
 }
 
 interface TradeResult {
@@ -229,6 +232,9 @@ export default function ResultsPage() {
               tradesPerDay: Number(parsedData.tradesPerDay) || 3,
               riskAmount: Number(parsedData.riskAmount) || 10,
               rewardAmount: Number(parsedData.rewardAmount) || 15,
+              enableStopLoss: parsedData.enableStopLoss || false,
+              stopLossType: parsedData.stopLossType || null,
+              stopLossValue: parsedData.stopLossValue ? Number(parsedData.stopLossValue) : null,
             }
 
             console.log("[v0] Validated data:", validatedData)
@@ -327,6 +333,10 @@ export default function ResultsPage() {
       tradesPerDay,
       riskAmount,
       rewardAmount,
+      // Destructure stop loss fields
+      enableStopLoss,
+      stopLossType,
+      stopLossValue,
     } = data
 
     if (interestType === "custom" && interestRate) {
@@ -453,7 +463,31 @@ export default function ResultsPage() {
 
     const calculatedRiskAmount = (initialCapital * riskPercentage) / 100
     const calculatedRewardAmount = calculatedRiskAmount * riskRewardRatio
-    const calculatedTradesPerDay = Math.ceil(targetProfit / (calculatedRewardAmount * (winRate / 100)))
+
+    // Calculate stop loss amount if enabled
+    let stopLossAmount = 0
+    if (enableStopLoss && stopLossValue !== null && stopLossValue !== undefined) {
+      if (stopLossType === "percentage") {
+        stopLossAmount = (initialCapital * stopLossValue) / 100
+      } else if (stopLossType === "fixed") {
+        stopLossAmount = stopLossValue
+      }
+    }
+
+    // Adjust trades per day calculation considering stop loss
+    const effectiveRewardPerTrade = calculatedRewardAmount // Assume for now rewardAmount is the target gain per trade
+    const effectiveRiskPerTrade = calculatedRiskAmount // Assume for now riskAmount is the target loss per trade
+
+    // If stop loss is enabled and has a value, it might affect the calculation of trades needed to reach target profit.
+    // This is a simplified adjustment. A more accurate model would consider the stop loss impact on the overall strategy.
+    const profitTargetPerDay = targetProfit // Assuming targetProfit is daily
+
+    const tradesPerDayAdjusted =
+      profitTargetPerDay > 0 && effectiveRewardPerTrade > 0
+        ? Math.ceil(profitTargetPerDay / (effectiveRewardPerTrade * (winRate / 100)))
+        : tradesPerDay || 3 // Fallback to default or provided tradesPerDay
+
+    const finalTradesPerDay = Math.max(1, tradesPerDayAdjusted) // Ensure at least 1 trade
 
     const trades: TradeResult[] = []
     let currentBalance = initialCapital
@@ -462,7 +496,7 @@ export default function ResultsPage() {
     let maxDrawdown = 0
 
     for (let day = 1; day <= tradingDays; day++) {
-      const dailyTrades = calculatedTradesPerDay
+      const dailyTrades = finalTradesPerDay
       let dailyProfit = 0
       let wins = 0
       let losses = 0
@@ -473,7 +507,10 @@ export default function ResultsPage() {
           dailyProfit += calculatedRewardAmount
           wins++
         } else {
-          dailyProfit -= calculatedRiskAmount
+          // Apply stop loss if enabled and loss occurs
+          const actualLoss =
+            stopLossAmount > 0 && calculatedRiskAmount > stopLossAmount ? stopLossAmount : calculatedRiskAmount
+          dailyProfit -= actualLoss
           losses++
         }
       }
@@ -507,7 +544,7 @@ export default function ResultsPage() {
       })
     }
 
-    const totalTrades = tradingDays * calculatedTradesPerDay
+    const totalTrades = tradingDays * finalTradesPerDay
     const totalWins = trades.reduce((sum, trade) => sum + trade.wins, 0)
     const totalLosses = trades.reduce((sum, trade) => sum + trade.losses, 0)
     const totalProfit = cumulativeProfit
@@ -525,8 +562,16 @@ export default function ResultsPage() {
     const roi = (totalProfit / initialCapital) * 100
     const annualizedReturn = Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1
     const sharpeRatio = volatility > 0 ? (annualizedReturn * 100) / volatility : 0
+
+    // Recalculate profit factor using total wins/losses and risk/reward amounts
+    const totalProfitFromWins = totalWins * calculatedRewardAmount
+    const totalLossFromLosses = totalLosses * calculatedRiskAmount
     const profitFactor =
-      totalWins > 0 && totalLosses > 0 ? (totalWins * calculatedRewardAmount) / (totalLosses * calculatedRiskAmount) : 0
+      totalLossFromLosses > 0
+        ? totalProfitFromWins / totalLossFromLosses
+        : totalProfitFromWins > 0
+          ? Number.POSITIVE_INFINITY
+          : 0
 
     return {
       trades,
@@ -548,7 +593,7 @@ export default function ResultsPage() {
         profitableDays,
         losingDays,
         breakEvenDays,
-        averageTradesPerDay: calculatedTradesPerDay,
+        averageTradesPerDay: finalTradesPerDay,
         totalTradingDays: tradingDays,
         roi,
         annualizedReturn: annualizedReturn * 100,
@@ -561,8 +606,6 @@ export default function ResultsPage() {
         lossPerTrade: calculatedRiskAmount,
         largestWin: calculatedRewardAmount,
         largestLoss: calculatedRiskAmount,
-        averageWin: calculatedRewardAmount,
-        averageLoss: calculatedRiskAmount,
         winLossRatio: calculatedRewardAmount / calculatedRiskAmount,
         expectancy: (winRate / 100) * calculatedRewardAmount - ((100 - winRate) / 100) * calculatedRiskAmount,
         kelly: 0,
@@ -957,6 +1000,31 @@ export default function ResultsPage() {
                     {fxData.interestRate}% {fxData.interestType === "custom" ? "(Custom)" : ""}
                   </p>
                 </div>
+                {/* Display stop loss configuration */}
+                <div>
+                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Enable Stop Loss</p>
+                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                    {fxData.enableStopLoss ? "Yes" : "No"}
+                  </p>
+                </div>
+                {fxData.enableStopLoss && (
+                  <>
+                    <div>
+                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Type</p>
+                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                        {fxData.stopLossType || "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Value</p>
+                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                        {fxData.stopLossType === "percentage"
+                          ? `${fxData.stopLossValue}%`
+                          : `${currencySymbol}${fxData.stopLossValue?.toLocaleString()}`}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

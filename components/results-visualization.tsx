@@ -9,7 +9,34 @@ import { Badge } from "@/components/ui/badge"
 import { useTranslationContext } from "@/lib/translation-context"
 
 interface ResultsVisualizationProps {
-  results: any
+  results: {
+    currency?: string
+    initialCapital: number
+    targetProfit: number
+    riskPercentage: number
+    winRate: number
+    riskRewardRatio: number
+    tradingDays: number
+    finalCapital: number
+    totalProfit: number
+    totalTrades: number
+    winningTrades: number
+    losingTrades: number
+    maxDrawdown: number
+    profitFactor: number
+    averageDailyProfit: number
+    percentageProfit: number
+    interestRateType?: string
+    interestRate?: number
+    startDate?: string
+    endDate?: string
+    hasStopLoss?: boolean
+    stopLossAmount?: number
+    stopLossType?: string | null
+    stopLossValue?: number | null
+    hasDailyTrades?: boolean
+    tradesPerDay?: number
+  }
   onExport: (type: "csv" | "print" | "pdf") => void
   currentLanguage: string
   onCreateSheet?: (sheetData: any) => void
@@ -36,7 +63,7 @@ export default function ResultsVisualization({
     const calculateDates = () => {
       const startDate = new Date()
       const endDate = new Date()
-      endDate.setDate(startDate.getDate() + results.tradingPeriod.days)
+      endDate.setDate(startDate.getDate() + results.tradingDays)
 
       return {
         startDate: startDate.toLocaleDateString(),
@@ -60,17 +87,17 @@ export default function ResultsVisualization({
       const progress = currentStep / steps
 
       setAnimatedValues({
-        netProfit: Math.floor(safeNumber(results.netProfit) * progress),
-        returnPercentage: Number((safeNumber(results.returnPercentage) * progress).toFixed(2)),
-        totalTrades: Math.floor(safeNumber(results.totalTrades) * progress),
+        netProfit: Math.floor(results.totalProfit * progress),
+        returnPercentage: Number((results.percentageProfit * progress).toFixed(2)),
+        totalTrades: Math.floor(results.totalTrades * progress),
       })
 
       if (currentStep >= steps) {
         clearInterval(interval)
         setAnimatedValues({
-          netProfit: safeNumber(results.netProfit),
-          returnPercentage: safeNumber(results.returnPercentage),
-          totalTrades: safeNumber(results.totalTrades),
+          netProfit: results.totalProfit,
+          returnPercentage: results.percentageProfit,
+          totalTrades: results.totalTrades,
         })
       }
     }, [results])
@@ -79,51 +106,38 @@ export default function ResultsVisualization({
   }, [results])
 
   const generateChartData = (view: string) => {
-    const { tradingPeriod, initialCapital, netProfit, totalTrades, interestRate, dailyBreakdown, interestRateType } =
-      results
+    const safeNumber = (value: any, fallback = 0) => {
+      const num = Number(value)
+      return isNaN(num) || value === null || value === undefined ? fallback : num
+    }
+
+    const {
+      tradingDays,
+      initialCapital,
+      totalProfit,
+      totalTrades,
+      interestRateType,
+      interestRate,
+      startDate,
+      endDate,
+    } = results
     const safeInitialCapital = safeNumber(initialCapital)
-    const safeNetProfit = safeNumber(netProfit)
+    const safeTotalProfit = safeNumber(totalProfit)
     const safeTotalTrades = safeNumber(totalTrades)
     const safeInterestRate = safeNumber(interestRate)
 
-    if (view === "daily" && dailyBreakdown && dailyBreakdown.length > 0 && interestRateType === "custom") {
-      return dailyBreakdown.map((day, index) => ({
-        period: `Day ${day.day}`,
-        date: day.date || new Date(Date.now() + index * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        earnings: safeNumber(day.earning),
-        totalEarnings: safeNumber(day.totalEarnings),
-        balance: safeNumber(day.balance),
-        trades: Math.floor((safeTotalTrades / safeNumber(tradingPeriod?.tradingDays)) * day.day),
-        capital: safeNumber(day.balance),
-        profit: safeNumber(day.totalEarnings),
-      }))
-    }
-
-    if (view === "daily" && dailyBreakdown && dailyBreakdown.length > 0 && interestRateType === "low") {
-      return dailyBreakdown.map((day, index) => ({
-        period: `Day ${day.day}`,
-        date: day.date || new Date(Date.now() + index * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        earnings: safeNumber(day.earning),
-        totalEarnings: safeNumber(day.balance) - safeInitialCapital, // Total earnings = current balance - initial
-        balance: safeNumber(day.balance),
-        trades: Math.floor((safeTotalTrades / safeNumber(tradingPeriod?.tradingDays)) * day.day),
-        capital: safeNumber(day.balance),
-        profit: safeNumber(day.balance) - safeInitialCapital,
-      }))
-    }
-
-    const profitPerTrade = safeTotalTrades > 0 ? safeNetProfit / safeTotalTrades : 0
+    const profitPerTrade = safeTotalTrades > 0 ? safeTotalProfit / safeTotalTrades : 0
     const dailyInterestRate = safeInterestRate / 365 / 100
 
     switch (view) {
       case "daily": {
         const dailyData = []
-        const tradesPerDay = safeTotalTrades / safeNumber(tradingPeriod?.tradingDays)
+        const tradesPerDay = safeTotalTrades / tradingDays
         let cumulativeProfit = 0
         let currentBalance = safeInitialCapital
-        const currentDate = new Date()
+        const currentDate = new Date(startDate)
 
-        for (let day = 1; day <= Math.min(safeNumber(tradingPeriod?.tradingDays), 30); day++) {
+        for (let day = 1; day <= Math.min(tradingDays, 30); day++) {
           const dailyTradingProfit = profitPerTrade * tradesPerDay
           const dailyInterest = currentBalance * dailyInterestRate
           const totalDailyEarnings = dailyTradingProfit + dailyInterest
@@ -150,12 +164,12 @@ export default function ResultsVisualization({
 
       case "weekly": {
         const weeklyData = []
-        const tradesPerWeek = safeTotalTrades / safeNumber(tradingPeriod?.weeks)
+        const tradesPerWeek = safeTotalTrades / Math.ceil(tradingDays / 7)
         let cumulativeProfit = 0
         let currentBalance = safeInitialCapital
-        const currentDate = new Date()
+        const currentDate = new Date(startDate)
 
-        for (let week = 1; week <= Math.min(safeNumber(tradingPeriod?.weeks), 52); week++) {
+        for (let week = 1; week <= Math.min(Math.ceil(tradingDays / 7), 52); week++) {
           const weeklyTradingProfit = profitPerTrade * tradesPerWeek
           const weeklyInterest = currentBalance * dailyInterestRate * 7
           const totalWeeklyEarnings = weeklyTradingProfit + weeklyInterest
@@ -182,11 +196,11 @@ export default function ResultsVisualization({
 
       case "monthly": {
         const monthlyData = []
-        const monthsInPeriod = Math.ceil(safeNumber(tradingPeriod?.weeks) / 4.33)
+        const monthsInPeriod = Math.ceil(tradingDays / 30)
         const tradesPerMonth = safeTotalTrades / monthsInPeriod
         let cumulativeProfit = 0
         let currentBalance = safeInitialCapital
-        const currentDate = new Date()
+        const currentDate = new Date(startDate)
 
         for (let month = 1; month <= Math.min(monthsInPeriod, 12); month++) {
           const monthlyTradingProfit = profitPerTrade * tradesPerMonth
@@ -215,11 +229,11 @@ export default function ResultsVisualization({
 
       case "yearly": {
         const yearlyData = []
-        const yearsInPeriod = Math.ceil(safeNumber(tradingPeriod?.weeks) / 52)
+        const yearsInPeriod = Math.ceil(tradingDays / 365)
         const tradesPerYear = safeTotalTrades / yearsInPeriod
         let cumulativeProfit = 0
         let currentBalance = safeInitialCapital
-        const currentDate = new Date()
+        const currentDate = new Date(startDate)
 
         for (let year = 1; year <= Math.min(yearsInPeriod, 5); year++) {
           const yearlyTradingProfit = profitPerTrade * tradesPerYear
@@ -271,14 +285,14 @@ export default function ResultsVisualization({
         type: "positive",
       },
       {
-        metric: t.netProfit + " (Net Profit)",
-        value: `${results.currency || "$"} ${safeNumber(results.netProfit).toLocaleString()}`,
-        type: safeNumber(results.netProfit) >= 0 ? "positive" : "negative",
+        metric: t.totalProfit + " (Total Profit)",
+        value: `${results.currency || "$"} ${safeNumber(results.totalProfit).toLocaleString()}`,
+        type: safeNumber(results.totalProfit) >= 0 ? "positive" : "negative",
       },
       {
-        metric: t.returnPercentage,
-        value: `${safeNumber(results.returnPercentage).toFixed(2)}%`,
-        type: safeNumber(results.returnPercentage) >= 0 ? "positive" : "negative",
+        metric: t.percentageProfit,
+        value: `${safeNumber(results.percentageProfit).toFixed(2)}%`,
+        type: safeNumber(results.percentageProfit) >= 0 ? "positive" : "negative",
       },
       {
         metric: "Interest Rate (%)",
@@ -291,8 +305,8 @@ export default function ResultsVisualization({
         type: "neutral",
       },
       {
-        metric: t.totalTrades + " / Business Days",
-        value: `${safeNumber(results.tradingPeriod?.days)} / ${safeNumber(results.tradingPeriod?.tradingDays)}`,
+        metric: t.totalTrades + " / Trading Days",
+        value: `${safeNumber(results.tradingDays)} / ${safeNumber(results.tradingDays)}`,
         type: "neutral",
       },
       { metric: t.totalTrades, value: safeNumber(results.totalTrades).toLocaleString(), type: "neutral" },
@@ -300,23 +314,54 @@ export default function ResultsVisualization({
       { metric: t.losingTrades, value: safeNumber(results.losingTrades).toLocaleString(), type: "negative" },
       {
         metric: t.winRate,
-        value: `${safeNumber(results.totalTrades) > 0 ? ((safeNumber(results.winningTrades) / safeNumber(results.totalTrades)) * 100).toFixed(2) : 0}%`,
+        value: `${safeNumber(results.winRate).toFixed(2)}%`,
         type: "neutral",
+      },
+      {
+        metric: "Risk Percentage (%)",
+        value: `${safeNumber(results.riskPercentage).toFixed(2)}%`,
+        type: "neutral",
+      },
+      {
+        metric: "Risk-Reward Ratio",
+        value: safeNumber(results.riskRewardRatio).toFixed(2),
+        type: "neutral",
+      },
+      {
+        metric: "Average Daily Profit",
+        value: `${results.currency || "$"} ${safeNumber(results.averageDailyProfit).toFixed(2)}`,
+        type: safeNumber(results.averageDailyProfit) >= 0 ? "positive" : "negative",
+      },
+      {
+        metric: "Max Drawdown",
+        value: `${results.currency || "$"} ${safeNumber(results.maxDrawdown).toFixed(2)}`,
+        type: "negative",
+      },
+      {
+        metric: "Profit Factor",
+        value: safeNumber(results.profitFactor).toFixed(2),
+        type: "positive",
       },
     ]
 
     if (results.hasStopLoss) {
+      const stopLossDisplay =
+        results.stopLossType === "percentage"
+          ? `${safeNumber(results.stopLossValue)}%`
+          : `${results.currency || "$"} ${safeNumber(results.stopLossValue).toLocaleString()}`
+
       baseData.push({
-        metric: "Per-Day Stop Loss (if active)",
-        value: `${results.currency || "$"} ${safeNumber(results.stopLossAmount).toLocaleString()}`,
+        metric:
+          results.stopLossType === "percentage" ? "Per-Day Stop Loss (Percentage)" : "Per-Day Stop Loss (Fixed Amount)",
+        value: stopLossDisplay,
         type: "negative",
       })
     }
 
     if (results.hasDailyTrades) {
       const tradesPerDay =
-        safeNumber(results.tradingPeriod?.tradingDays) > 0
-          ? (safeNumber(results.totalTrades) / safeNumber(results.tradingPeriod?.tradingDays)).toFixed(1)
+        safeNumber(results.tradingDays) > 0
+          ? (safeNumber(results.totalTrades) / safeNumber(results.tradingDays)).toFixed(1)
           : "0"
       baseData.push({
         metric: "Trades Per Day (if active)",
@@ -325,33 +370,7 @@ export default function ResultsVisualization({
       })
     }
 
-    const optionalData = []
-
-    if (results.hasRiskPerTrade) {
-      optionalData.push({
-        metric: t.riskPerTrade,
-        value: `${safeNumber(results.riskPerTradeValue)}%`,
-        type: "neutral",
-      })
-    }
-
-    if (results.hasWinRate) {
-      optionalData.push({
-        metric: "Expected " + t.winRate,
-        value: `${safeNumber(results.winRateValue)}%`,
-        type: "neutral",
-      })
-    }
-
-    if (results.hasRiskRewardRatio) {
-      optionalData.push({
-        metric: t.riskRewardRatio,
-        value: safeNumber(results.riskRewardRatioValue),
-        type: "neutral",
-      })
-    }
-
-    return [...baseData, ...optionalData]
+    return baseData
   }
 
   const tableData = generateTableData()
@@ -412,7 +431,7 @@ export default function ResultsVisualization({
                 {results.currency || "$"} {safeNumber(animatedValues.netProfit).toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground">Total Earnings</p>
-              <p className="text-xs text-muted-foreground">(Net Profit)</p>
+              <p className="text-xs text-muted-foreground">(Total Profit)</p>
             </div>
           </CardContent>
         </Card>
@@ -432,19 +451,14 @@ export default function ResultsVisualization({
         <Card className="glass-card border-border bg-muted/5">
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-mono font-bold text-foreground mb-2">
-                {safeNumber(results.tradingPeriod?.days)}
-              </div>
-              <p className="text-sm text-muted-foreground">Total Days</p>
-              <p className="text-xs text-muted-foreground">
-                ({safeNumber(results.tradingPeriod?.tradingDays)} Business Days)
-              </p>
+              <div className="text-2xl font-mono font-bold text-foreground mb-2">{safeNumber(results.tradingDays)}</div>
+              <p className="text-sm text-muted-foreground">Total Trading Days</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {(results.hasRiskPerTrade || results.hasWinRate || results.hasRiskRewardRatio) && (
+      {(results.hasStopLoss || results.hasDailyTrades) && (
         <Card className="glass-card border-primary/20 bg-primary/5">
           <CardHeader>
             <CardTitle className="text-lg font-heading">
@@ -454,28 +468,26 @@ export default function ResultsVisualization({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {results.hasRiskPerTrade && (
+              {results.hasStopLoss && (
                 <div className="text-center">
                   <div className="text-xl font-mono font-bold text-primary mb-1">
-                    {safeNumber(results.riskPerTradeValue)}%
+                    {results.stopLossType === "percentage"
+                      ? `${safeNumber(results.stopLossValue)}%`
+                      : `${results.currency || "$"} ${safeNumber(results.stopLossValue).toLocaleString()}`}
                   </div>
-                  <p className="text-sm text-muted-foreground">{t.riskPerTrade}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {results.stopLossType === "percentage"
+                      ? "Per-Day Stop Loss (Percentage)"
+                      : "Per-Day Stop Loss (Fixed Amount)"}
+                  </p>
                 </div>
               )}
-              {results.hasWinRate && (
+              {results.hasDailyTrades && (
                 <div className="text-center">
                   <div className="text-xl font-mono font-bold text-primary mb-1">
-                    {safeNumber(results.winRateValue)}%
+                    {safeNumber(results.tradesPerDay).toFixed(2)}
                   </div>
-                  <p className="text-sm text-muted-foreground">{t.winRate}</p>
-                </div>
-              )}
-              {results.hasRiskRewardRatio && (
-                <div className="text-center">
-                  <div className="text-xl font-mono font-bold text-primary mb-1">
-                    {safeNumber(results.riskRewardRatioValue)}
-                  </div>
-                  <p className="text-sm text-muted-foreground">{t.riskRewardRatio}</p>
+                  <p className="text-sm text-muted-foreground">Trades Per Day</p>
                 </div>
               )}
             </div>
@@ -490,13 +502,13 @@ export default function ResultsVisualization({
             <div>
               <CardTitle className="font-heading">
                 <i className="fas fa-chart-line mr-2 text-primary"></i>
-                Detailed Breakdown & Projection for {safeNumber(results.tradingPeriod?.tradingDays)} Trading Days
+                Detailed Breakdown & Projection for {safeNumber(results.tradingDays)} Trading Days
               </CardTitle>
               <CardDescription>
                 From {startDate} to {endDate} • Interest Rate: {safeNumber(results.interestRate)}%
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -573,7 +585,9 @@ export default function ResultsVisualization({
                     {results.interestRateType && (
                       <CardDescription>
                         Interest Type:{" "}
-                        {results.interestRateType === "custom" ? "Custom Interest (Compound)" : "Low Interest (7-10%)"}
+                        {results.interestRateType === "custom"
+                          ? "Custom Interest (Compound)"
+                          : "Simple Interest (7-10%)"}
                         {results.interestRateType === "custom" &&
                           ` - ${safeNumber(results.interestRate)}% daily compound interest`}
                       </CardDescription>
@@ -688,9 +702,9 @@ export default function ResultsVisualization({
             <div className="space-y-2">
               <h4 className="font-medium text-sm">Risk Assessment</h4>
               <p className="text-sm text-muted-foreground">
-                {safeNumber(results.returnPercentage) > 20
+                {safeNumber(results.percentageProfit) > 20
                   ? "High return potential with elevated risk profile"
-                  : safeNumber(results.returnPercentage) > 10
+                  : safeNumber(results.percentageProfit) > 10
                     ? "Moderate return with balanced risk management"
                     : "Conservative approach with lower risk exposure"}
               </p>
