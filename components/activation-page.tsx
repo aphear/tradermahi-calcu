@@ -52,7 +52,23 @@ export default function ActivationPage({ onLoginSuccess, currentLanguage, onLang
         }),
       })
 
-      const result = await response.json()
+      if (!response.ok) {
+        console.log("[v0] API response not OK:", response.status, response.statusText)
+        setError("Server error. Please try again later.")
+        triggerShake()
+        return
+      }
+
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        console.error("[v0] Failed to parse response:", parseError)
+        setError("Server returned invalid response. Please try again.")
+        triggerShake()
+        return
+      }
+
       console.log("[v0] Validation response:", result)
 
       if (result.valid) {
