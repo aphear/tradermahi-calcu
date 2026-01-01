@@ -76,7 +76,6 @@
 }
 
 @theme inline {
-  /* Added custom font variables for trading theme */
   --font-sans: var(--font-poppins);
   --font-heading: var(--font-rajdhani);
   --font-mono: var(--font-roboto-mono);
@@ -126,7 +125,6 @@
     @apply bg-background text-foreground;
   }
 
-  /* Added custom utility classes for trading theme */
   .font-heading {
     font-family: var(--font-heading);
   }
@@ -147,7 +145,6 @@
   }
 }
 
-/* Added custom animations for trading theme */
 @keyframes pulse-neon {
   0%,
   100% {
