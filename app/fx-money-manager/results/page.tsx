@@ -179,9 +179,27 @@ interface Results {
   }
 }
 
+const defaultFxData: FxData = {
+  currency: "USD",
+  initialCapital: 1000,
+  targetProfit: 100,
+  riskPercentage: 2,
+  winRate: 60,
+  riskRewardRatio: 2,
+  tradingDays: 30,
+  interestType: "low",
+  interestRate: 10,
+  tradesPerDay: 3,
+  riskAmount: 10,
+  rewardAmount: 15,
+  enableStopLoss: false,
+  stopLossType: null,
+  stopLossValue: null,
+}
+
 export default function ResultsPage() {
   const router = useRouter()
-  const [fxData, setFxData] = useState<FxData | null>(null)
+  const [fxData, setFxData] = useState<FxData>(defaultFxData)
   const [results, setResults] = useState<Results | null>(null)
   const [viewMode, setViewMode] = useState<"daily" | "weekly" | "monthly">("daily")
   const [sortColumn, setSortColumn] = useState<string>("day")
@@ -206,75 +224,91 @@ export default function ResultsPage() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dataLoaded, setDataLoaded] = useState(false)
 
   useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        const data = localStorage.getItem("fxManager")
-        if (data) {
-          const parsedData = JSON.parse(data)
-          console.log("[v0] Retrieved data from localStorage:", parsedData)
-
-          if (parsedData && typeof parsedData === "object") {
-            // Set default values for missing fields
-            const validatedData = {
-              currency: parsedData.currency || "USD",
-              initialCapital: Number(parsedData.initialCapital) || 1000,
-              targetProfit: Number(parsedData.targetProfit) || 100,
-              riskPercentage: Number(parsedData.riskPercentage) || 2,
-              winRate: Number(parsedData.winRate) || 60,
-              riskRewardRatio: Number(parsedData.riskRewardRatio) || 2,
-              tradingDays: Number(parsedData.totalDays) || Number(parsedData.tradingDays) || 30,
-              startDate: parsedData.startDate,
-              endDate: parsedData.endDate,
-              interestType: parsedData.interestType || "low",
-              interestRate: Number(parsedData.interestRate) || 10,
-              tradesPerDay: Number(parsedData.tradesPerDay) || 3,
-              riskAmount: Number(parsedData.riskAmount) || 10,
-              rewardAmount: Number(parsedData.rewardAmount) || 15,
-              enableStopLoss: parsedData.enableStopLoss || false,
-              stopLossType: parsedData.stopLossType || null,
-              stopLossValue: parsedData.stopLossValue ? Number(parsedData.stopLossValue) : null,
-            }
-
-            console.log("[v0] Validated data:", validatedData)
-            setFxData(validatedData)
-          } else {
-            console.log("[v0] Invalid data structure, redirecting...")
-            router.push("/fx-money-manager")
-          }
-        } else {
-          console.log("[v0] No data found, redirecting...")
-          router.push("/fx-money-manager")
+    const loadData = () => {
+      try {
+        if (typeof window === "undefined") {
+          return
         }
+
+        const data = localStorage.getItem("fxManager")
+
+        if (!data) {
+          setError("No data found. Please go back and enter your trading parameters.")
+          setIsLoading(false)
+          return
+        }
+
+        let parsedData
+        try {
+          parsedData = JSON.parse(data)
+        } catch (parseError) {
+          setError("Invalid data format. Please go back and re-enter your parameters.")
+          setIsLoading(false)
+          return
+        }
+
+        if (!parsedData || typeof parsedData !== "object") {
+          setError("Invalid data structure. Please go back and re-enter your parameters.")
+          setIsLoading(false)
+          return
+        }
+
+        // Set validated values with safe defaults
+        const validatedData: FxData = {
+          currency: parsedData.currency || "USD",
+          initialCapital: Number(parsedData.initialCapital) || 1000,
+          targetProfit: Number(parsedData.targetProfit) || 100,
+          riskPercentage: Number(parsedData.riskPercentage) || 2,
+          winRate: Number(parsedData.winRate) || 60,
+          riskRewardRatio: Number(parsedData.riskRewardRatio) || 2,
+          tradingDays: Number(parsedData.totalDays) || Number(parsedData.tradingDays) || 30,
+          startDate: parsedData.startDate || undefined,
+          endDate: parsedData.endDate || undefined,
+          interestType: parsedData.interestType || "low",
+          interestRate: Number(parsedData.interestRate) || 10,
+          tradesPerDay: Number(parsedData.tradesPerDay) || 3,
+          riskAmount: Number(parsedData.riskAmount) || 10,
+          rewardAmount: Number(parsedData.rewardAmount) || 15,
+          enableStopLoss: Boolean(parsedData.enableStopLoss),
+          stopLossType: parsedData.stopLossType || null,
+          stopLossValue: parsedData.stopLossValue ? Number(parsedData.stopLossValue) : null,
+        }
+
+        setFxData(validatedData)
+        setDataLoaded(true)
+        setIsLoading(false)
+      } catch (err) {
+        console.error("Error loading data:", err)
+        setError("An error occurred while loading data. Please try again.")
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.error("[v0] Error parsing localStorage data:", error)
-      setError("Error loading data")
-      // Don't redirect immediately, show error message
-    } finally {
-      setIsLoading(false)
     }
-  }, [router])
+
+    loadData()
+  }, [])
 
   const getCurrencySymbol = (currencyCode: string): string => {
-    try {
-      if (!currencyCode) {
-        console.log("[v0] No currency code provided, using default $")
-        return "$"
-      }
-
-      console.log("[v0] Looking for currency symbol for:", currencyCode)
-      const currency = currencies.find((c) => c.code === currencyCode.toUpperCase())
-      const symbol = currency?.symbol || "$"
-      console.log("[v0] Found currency symbol:", symbol)
-      return symbol
-    } catch (error) {
-      console.error("[v0] Error getting currency symbol:", error)
-      return "$"
-    }
+    if (!currencyCode) return "$"
+    const currency = currencies.find((c) => c.code === currencyCode.toUpperCase())
+    return currency?.symbol || "$"
   }
 
+  useEffect(() => {
+    if (dataLoaded && fxData) {
+      try {
+        const calculatedResults = calculateTradingResults(fxData)
+        setResults(calculatedResults)
+      } catch (err) {
+        console.error("Error calculating results:", err)
+        setError("Error calculating trading results. Please check your parameters.")
+      }
+    }
+  }, [dataLoaded, fxData])
+
+  // Animation effect
   useEffect(() => {
     if (results && fxData) {
       const duration = 2000
@@ -308,18 +342,6 @@ export default function ResultsPage() {
     }
   }, [results, fxData])
 
-  useEffect(() => {
-    if (fxData) {
-      try {
-        const calculatedResults = calculateTradingResults(fxData)
-        setResults(calculatedResults)
-      } catch (error) {
-        console.error("Error calculating results:", error)
-        setError("Error calculating trading results")
-      }
-    }
-  }, [fxData])
-
   const calculateTradingResults = (data: FxData): Results => {
     const {
       initialCapital,
@@ -331,17 +353,13 @@ export default function ResultsPage() {
       interestType,
       interestRate,
       tradesPerDay,
-      riskAmount,
-      rewardAmount,
-      // Destructure stop loss fields
       enableStopLoss,
       stopLossType,
       stopLossValue,
     } = data
 
+    // Compound interest calculation
     if (interestType === "custom" && interestRate) {
-      console.log("[v0] Using compound interest calculation with rate:", interestRate)
-
       const trades: TradeResult[] = []
       let currentBalance = initialCapital
       let cumulativeProfit = 0
@@ -350,7 +368,6 @@ export default function ResultsPage() {
 
       for (let day = 1; day <= tradingDays; day++) {
         const dailyProfit = (currentBalance * interestRate) / 100
-
         currentBalance += dailyProfit
         cumulativeProfit += dailyProfit
 
@@ -380,21 +397,17 @@ export default function ResultsPage() {
         })
       }
 
-      const totalTrades = tradingDays
-      const totalWins = tradingDays
-      const totalLosses = 0
       const totalProfit = cumulativeProfit
       const finalBalance = currentBalance
-
       const roi = (totalProfit / initialCapital) * 100
       const annualizedReturn = Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1
 
       return {
         trades,
         summary: {
-          totalTrades,
-          totalWins,
-          totalLosses,
+          totalTrades: tradingDays,
+          totalWins: tradingDays,
+          totalLosses: 0,
           totalProfit,
           finalBalance,
           maxDrawdown,
@@ -461,10 +474,10 @@ export default function ResultsPage() {
       }
     }
 
+    // Standard trading calculation
     const calculatedRiskAmount = (initialCapital * riskPercentage) / 100
     const calculatedRewardAmount = calculatedRiskAmount * riskRewardRatio
 
-    // Calculate stop loss amount if enabled
     let stopLossAmount = 0
     if (enableStopLoss && stopLossValue !== null && stopLossValue !== undefined) {
       if (stopLossType === "percentage") {
@@ -474,20 +487,15 @@ export default function ResultsPage() {
       }
     }
 
-    // Adjust trades per day calculation considering stop loss
-    const effectiveRewardPerTrade = calculatedRewardAmount // Assume for now rewardAmount is the target gain per trade
-    const effectiveRiskPerTrade = calculatedRiskAmount // Assume for now riskAmount is the target loss per trade
-
-    // If stop loss is enabled and has a value, it might affect the calculation of trades needed to reach target profit.
-    // This is a simplified adjustment. A more accurate model would consider the stop loss impact on the overall strategy.
-    const profitTargetPerDay = targetProfit // Assuming targetProfit is daily
+    const effectiveRewardPerTrade = calculatedRewardAmount
+    const profitTargetPerDay = targetProfit
 
     const tradesPerDayAdjusted =
       profitTargetPerDay > 0 && effectiveRewardPerTrade > 0
         ? Math.ceil(profitTargetPerDay / (effectiveRewardPerTrade * (winRate / 100)))
-        : tradesPerDay || 3 // Fallback to default or provided tradesPerDay
+        : tradesPerDay || 3
 
-    const finalTradesPerDay = Math.max(1, tradesPerDayAdjusted) // Ensure at least 1 trade
+    const finalTradesPerDay = Math.max(1, tradesPerDayAdjusted)
 
     const trades: TradeResult[] = []
     let currentBalance = initialCapital
@@ -507,7 +515,6 @@ export default function ResultsPage() {
           dailyProfit += calculatedRewardAmount
           wins++
         } else {
-          // Apply stop loss if enabled and loss occurs
           const actualLoss =
             stopLossAmount > 0 && calculatedRiskAmount > stopLossAmount ? stopLossAmount : calculatedRiskAmount
           dailyProfit -= actualLoss
@@ -540,7 +547,7 @@ export default function ResultsPage() {
         cumulativeProfit,
         balance: currentBalance,
         drawdown: currentDrawdown,
-        winRate: (wins / dailyTrades) * 100,
+        winRate: dailyTrades > 0 ? (wins / dailyTrades) * 100 : 0,
       })
     }
 
@@ -555,23 +562,25 @@ export default function ResultsPage() {
     const breakEvenDays = trades.filter((t) => t.dailyProfit === 0).length
 
     const dailyReturns = trades.map((t) => t.dailyProfit / initialCapital)
-    const averageReturn = dailyReturns.reduce((sum, ret) => sum + ret, 0) / dailyReturns.length
-    const variance = dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - averageReturn, 2), 0) / dailyReturns.length
-    const volatility = Math.sqrt(variance) * Math.sqrt(252) * 100
+    const averageReturn =
+      dailyReturns.length > 0 ? dailyReturns.reduce((sum, ret) => sum + ret, 0) / dailyReturns.length : 0
+    const variance =
+      dailyReturns.length > 0
+        ? dailyReturns.reduce((sum, ret) => sum + Math.pow(ret - averageReturn, 2), 0) / dailyReturns.length
+        : 0
+    const volatility = Math.sqrt(variance) * Math.sqrt(252)
+
+    const riskFreeRate = 0.02
+    const excessReturn = totalProfit / initialCapital - riskFreeRate
+    const sharpeRatio = volatility > 0 ? excessReturn / volatility : 0
 
     const roi = (totalProfit / initialCapital) * 100
-    const annualizedReturn = Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1
-    const sharpeRatio = volatility > 0 ? (annualizedReturn * 100) / volatility : 0
+    const annualizedReturn =
+      tradingDays > 0 ? (Math.pow(finalBalance / initialCapital, 365 / tradingDays) - 1) * 100 : 0
 
-    // Recalculate profit factor using total wins/losses and risk/reward amounts
-    const totalProfitFromWins = totalWins * calculatedRewardAmount
-    const totalLossFromLosses = totalLosses * calculatedRiskAmount
-    const profitFactor =
-      totalLossFromLosses > 0
-        ? totalProfitFromWins / totalLossFromLosses
-        : totalProfitFromWins > 0
-          ? Number.POSITIVE_INFINITY
-          : 0
+    const totalGrossWins = totalWins * calculatedRewardAmount
+    const totalGrossLosses = totalLosses * calculatedRiskAmount
+    const profitFactor = totalGrossLosses > 0 ? totalGrossWins / totalGrossLosses : totalGrossWins > 0 ? 999 : 0
 
     return {
       trades,
@@ -582,32 +591,34 @@ export default function ResultsPage() {
         totalProfit,
         finalBalance,
         maxDrawdown,
-        averageWinRate: (totalWins / totalTrades) * 100,
+        averageWinRate: totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0,
         profitFactor,
         sharpeRatio,
         maxConsecutiveWins: 0,
         maxConsecutiveLosses: 0,
-        averageDailyProfit: totalProfit / tradingDays,
-        bestDay: Math.max(...trades.map((t) => t.dailyProfit)),
-        worstDay: Math.min(...trades.map((t) => t.dailyProfit)),
+        averageDailyProfit: tradingDays > 0 ? totalProfit / tradingDays : 0,
+        bestDay: trades.length > 0 ? Math.max(...trades.map((t) => t.dailyProfit)) : 0,
+        worstDay: trades.length > 0 ? Math.min(...trades.map((t) => t.dailyProfit)) : 0,
         profitableDays,
         losingDays,
         breakEvenDays,
         averageTradesPerDay: finalTradesPerDay,
         totalTradingDays: tradingDays,
         roi,
-        annualizedReturn: annualizedReturn * 100,
-        volatility,
-        calmarRatio: annualizedReturn > 0 && maxDrawdown > 0 ? (annualizedReturn * 100) / maxDrawdown : 0,
+        annualizedReturn,
+        volatility: volatility * 100,
+        calmarRatio: maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0,
         sortinoRatio: 0,
-        recoveryFactor: 0,
-        payoffRatio: 0,
-        profitPerTrade: calculatedRewardAmount,
-        lossPerTrade: calculatedRiskAmount,
+        recoveryFactor: maxDrawdown > 0 ? totalProfit / ((initialCapital * maxDrawdown) / 100) : 0,
+        payoffRatio: calculatedRiskAmount > 0 ? calculatedRewardAmount / calculatedRiskAmount : 0,
+        profitPerTrade: totalWins > 0 ? totalGrossWins / totalWins : 0,
+        lossPerTrade: totalLosses > 0 ? totalGrossLosses / totalLosses : 0,
         largestWin: calculatedRewardAmount,
         largestLoss: calculatedRiskAmount,
-        winLossRatio: calculatedRewardAmount / calculatedRiskAmount,
-        expectancy: (winRate / 100) * calculatedRewardAmount - ((100 - winRate) / 100) * calculatedRiskAmount,
+        averageWin: calculatedRewardAmount,
+        averageLoss: calculatedRiskAmount,
+        winLossRatio: totalLosses > 0 ? totalWins / totalLosses : totalWins,
+        expectancy: totalTrades > 0 ? totalProfit / totalTrades : 0,
         kelly: 0,
         var95: 0,
         cvar95: 0,
@@ -643,12 +654,40 @@ export default function ResultsPage() {
     }
   }
 
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortColumn(column)
-      setSortDirection("asc")
+  const handleCreateSheet = () => {
+    try {
+      if (!results || !fxData) {
+        alert("No results to save")
+        return
+      }
+
+      const existingSheets = localStorage.getItem("forexPLSheets")
+      const sheets = existingSheets ? JSON.parse(existingSheets) : []
+
+      const newSheet = {
+        id: Date.now().toString(),
+        type: "forex",
+        createdAt: new Date().toISOString(),
+        currency: fxData.currency,
+        initialCapital: fxData.initialCapital,
+        finalBalance: results.summary.finalBalance,
+        totalProfit: results.summary.totalProfit,
+        roi: results.summary.roi,
+        tradingDays: fxData.tradingDays,
+        trades: results.trades,
+        summary: results.summary,
+        stopLossType: fxData.stopLossType,
+        stopLossValue: fxData.stopLossValue,
+      }
+
+      sheets.push(newSheet)
+      localStorage.setItem("forexPLSheets", JSON.stringify(sheets))
+
+      alert("You're Fx Result Sheet Creat On P/L Forex Sheet , Check Now")
+      router.push("/")
+    } catch (err) {
+      console.error("Error creating sheet:", err)
+      alert("Error creating sheet. Please try again.")
     }
   }
 
@@ -659,163 +698,97 @@ export default function ResultsPage() {
     }))
   }
 
-  const exportToCSV = () => {
-    if (!results) return
-
-    const csvContent = [
-      [
-        "Day",
-        "Date",
-        "Trades",
-        "Wins",
-        "Losses",
-        "Daily Profit",
-        "Cumulative Profit",
-        "Balance",
-        "Drawdown %",
-        "Win Rate %",
-      ],
-      ...results.trades.map((trade) => [
-        trade.day,
-        trade.date,
-        trade.trades,
-        trade.wins,
-        trade.losses,
-        trade.dailyProfit.toFixed(2),
-        trade.cumulativeProfit.toFixed(2),
-        trade.balance.toFixed(2),
-        trade.drawdown.toFixed(2),
-        trade.winRate.toFixed(2),
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "fx-trading-results.csv"
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortColumn(column)
+      setSortDirection("asc")
+    }
   }
 
-  const getAggregatedData = () => {
+  const getSortedTrades = () => {
     if (!results) return []
-
-    switch (viewMode) {
-      case "weekly":
-        const weeks: { [key: string]: TradeResult[] } = {}
-        results.trades.forEach((trade) => {
-          const date = new Date(trade.date)
-          const weekStart = new Date(date.setDate(date.getDate() - date.getDay()))
-          const weekKey = weekStart.toISOString().split("T")[0]
-          if (!weeks[weekKey]) weeks[weekKey] = []
-          weeks[weekKey].push(trade)
-        })
-
-        return Object.entries(weeks).map(([weekStart, trades], index) => ({
-          period: `Week ${index + 1}`,
-          date: weekStart,
-          trades: trades.reduce((sum, t) => sum + t.trades, 0),
-          wins: trades.reduce((sum, t) => sum + t.wins, 0),
-          losses: trades.reduce((sum, t) => sum + t.losses, 0),
-          dailyProfit: trades.reduce((sum, t) => sum + t.dailyProfit, 0),
-          cumulativeProfit: trades[trades.length - 1]?.cumulativeProfit || 0,
-          balance: trades[trades.length - 1]?.balance || 0,
-          drawdown: Math.max(...trades.map((t) => t.drawdown)),
-          winRate: (trades.reduce((sum, t) => sum + t.wins, 0) / trades.reduce((sum, t) => sum + t.trades, 0)) * 100,
-        }))
-
-      case "monthly":
-        const months: { [key: string]: TradeResult[] } = {}
-        results.trades.forEach((trade) => {
-          const date = new Date(trade.date)
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-          if (!months[monthKey]) months[monthKey] = []
-          months[monthKey].push(trade)
-        })
-
-        return Object.entries(months).map(([monthKey, trades], index) => ({
-          period: `Month ${index + 1}`,
-          date: monthKey + "-01",
-          trades: trades.reduce((sum, t) => sum + t.trades, 0),
-          wins: trades.reduce((sum, t) => sum + t.wins, 0),
-          losses: trades.reduce((sum, t) => sum + t.losses, 0),
-          dailyProfit: trades.reduce((sum, t) => sum + t.dailyProfit, 0),
-          cumulativeProfit: trades[trades.length - 1]?.cumulativeProfit || 0,
-          balance: trades[trades.length - 1]?.balance || 0,
-          drawdown: Math.max(...trades.map((t) => t.drawdown)),
-          winRate: (trades.reduce((sum, t) => sum + t.wins, 0) / trades.reduce((sum, t) => sum + t.trades, 0)) * 100,
-        }))
-
-      default:
-        return results.trades.map((trade) => ({
-          period: `Day ${trade.day}`,
-          ...trade,
-        }))
-    }
+    const sorted = [...results.trades].sort((a, b) => {
+      const aValue = a[sortColumn as keyof TradeResult]
+      const bValue = b[sortColumn as keyof TradeResult]
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue
+      }
+      return 0
+    })
+    return sorted
   }
 
-  const sortedData = getAggregatedData().sort((a, b) => {
-    const aValue = a[sortColumn as keyof typeof a]
-    const bValue = b[sortColumn as keyof typeof a]
+  const getViewData = () => {
+    if (!results) return []
+    const trades = getSortedTrades()
 
-    if (typeof aValue === "number" && typeof bValue === "number") {
-      return sortDirection === "asc" ? aValue - bValue : bValue - aValue
+    if (viewMode === "daily") {
+      return trades
     }
 
-    return sortDirection === "asc"
-      ? String(aValue).localeCompare(String(bValue))
-      : String(bValue).localeCompare(String(aValue))
-  })
-
-  const handleCreateSheet = () => {
-    if (!results || !fxData) return
-
-    const currencySymbol = getCurrencySymbol(fxData.currency)
-
-    // Create P/L entries from FX results
-    const plEntries = results.trades.map((trade, index) => ({
-      date: trade.date,
-      profit: trade.dailyProfit >= 0 ? trade.dailyProfit : 0,
-      loss: trade.dailyProfit < 0 ? Math.abs(trade.dailyProfit) : 0,
-      total: trade.balance - fxData.initialCapital, // Running total from initial capital
-      isWeekend: false,
-    }))
-
-    // Create sheet data for P/L Sheet component
-    const sheetData = {
-      currency: fxData.currency,
-      currencySymbol,
-      entries: plEntries,
-      totalDays: results.trades.length,
-      isFromResults: true,
-      type: "forex" as const, // Mark as forex type
+    if (viewMode === "weekly") {
+      const weeks: TradeResult[] = []
+      for (let i = 0; i < trades.length; i += 7) {
+        const weekTrades = trades.slice(i, i + 7)
+        const weekData: TradeResult = {
+          day: Math.floor(i / 7) + 1,
+          date: `Week ${Math.floor(i / 7) + 1}`,
+          trades: weekTrades.reduce((sum, t) => sum + t.trades, 0),
+          wins: weekTrades.reduce((sum, t) => sum + t.wins, 0),
+          losses: weekTrades.reduce((sum, t) => sum + t.losses, 0),
+          dailyProfit: weekTrades.reduce((sum, t) => sum + t.dailyProfit, 0),
+          cumulativeProfit: weekTrades[weekTrades.length - 1]?.cumulativeProfit || 0,
+          balance: weekTrades[weekTrades.length - 1]?.balance || 0,
+          drawdown: Math.max(...weekTrades.map((t) => t.drawdown)),
+          winRate:
+            weekTrades.reduce((sum, t) => sum + t.trades, 0) > 0
+              ? (weekTrades.reduce((sum, t) => sum + t.wins, 0) / weekTrades.reduce((sum, t) => sum + t.trades, 0)) *
+                100
+              : 0,
+        }
+        weeks.push(weekData)
+      }
+      return weeks
     }
 
-    localStorage.setItem(
-      "forexPLSheetData",
-      JSON.stringify({
-        selectedCurrency: fxData.currency,
-        plEntries,
-        showSheet: true,
-        prePopulatedData: sheetData,
-      }),
-    )
+    if (viewMode === "monthly") {
+      const months: TradeResult[] = []
+      for (let i = 0; i < trades.length; i += 30) {
+        const monthTrades = trades.slice(i, i + 30)
+        const monthData: TradeResult = {
+          day: Math.floor(i / 30) + 1,
+          date: `Month ${Math.floor(i / 30) + 1}`,
+          trades: monthTrades.reduce((sum, t) => sum + t.trades, 0),
+          wins: monthTrades.reduce((sum, t) => sum + t.wins, 0),
+          losses: monthTrades.reduce((sum, t) => sum + t.losses, 0),
+          dailyProfit: monthTrades.reduce((sum, t) => sum + t.dailyProfit, 0),
+          cumulativeProfit: monthTrades[monthTrades.length - 1]?.cumulativeProfit || 0,
+          balance: monthTrades[monthTrades.length - 1]?.balance || 0,
+          drawdown: Math.max(...monthTrades.map((t) => t.drawdown)),
+          winRate:
+            monthTrades.reduce((sum, t) => sum + t.trades, 0) > 0
+              ? (monthTrades.reduce((sum, t) => sum + t.wins, 0) / monthTrades.reduce((sum, t) => sum + t.trades, 0)) *
+                100
+              : 0,
+        }
+        months.push(monthData)
+      }
+      return months
+    }
 
-    alert("You're Fx Result Sheet Creat On P/L Forex Sheet , Check Now")
-
-    // Navigate to home page instead of trading dashboard to avoid 404
-    window.location.href = "/"
+    return trades
   }
+
+  const currencySymbol = getCurrencySymbol(fxData.currency)
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0d1520] text-[#e6eef9] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#2a7fff] mx-auto"></div>
-          <p className="mt-4 text-[#8fa3bf]">Loading results...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+          <p className="text-white">Loading results...</p>
         </div>
       </div>
     )
@@ -823,675 +796,336 @@ export default function ResultsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0d1520] text-[#e6eef9] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-lg">{error}</p>
-          <Button
-            onClick={() => router.push("/fx-money-manager")}
-            className="mt-4 bg-[#2a7fff] hover:bg-[#2a7fff]/80 text-white"
-          >
-            Go Back
-          </Button>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <Card className="bg-slate-800/50 border-red-500/50 max-w-md w-full">
+          <CardContent className="p-6 text-center">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-white mb-2">Error</h2>
+            <p className="text-gray-400 mb-4">{error}</p>
+            <Button
+              onClick={() => router.push("/fx-money-manager")}
+              className="bg-cyan-600 hover:bg-cyan-700 text-white"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  if (!fxData || !results) {
+  if (!results) {
     return (
-      <div className="min-h-screen bg-[#0d1520] text-[#e6eef9] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-[#8fa3bf]">No data available</p>
-          <Button
-            onClick={() => router.push("/fx-money-manager")}
-            className="mt-4 bg-[#2a7fff] hover:bg-[#2a7fff]/80 text-white"
-          >
-            Go Back
-          </Button>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+          <p className="text-white">Calculating results...</p>
         </div>
       </div>
     )
   }
 
-  const currencySymbol = getCurrencySymbol(fxData.currency)
+  const viewData = getViewData()
 
   return (
-    <div className="min-h-screen bg-[#0d1520] text-[#e6eef9]">
-      <header className="border-b border-[#2a7fff]/20 bg-[#131d2d]/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <div className="bg-slate-800/50 border-b border-slate-700/50 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <Button
-              variant="outline"
-              size="sm"
+              variant="ghost"
               onClick={() => router.push("/fx-money-manager")}
-              className="border-[#2a7fff]/30 hover:border-[#2a7fff]/50 bg-[#131d2d] text-[#e6eef9]"
+              className="text-gray-400 hover:text-white"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="w-10 h-10 rounded-lg bg-[#2a7fff]/20 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-[#2a7fff]" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold text-[#e6eef9] font-['Rajdhani']">Fx Result</h1>
-              <p className="text-sm text-[#8fa3bf]">Trading Analysis Dashboard</p>
+              <h1 className="text-xl font-bold text-white">Fx Results</h1>
+              <p className="text-sm text-gray-400">Trading Analysis & Projection</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportToCSV}
-              className="border-[#2a7fff]/30 hover:border-[#2a7fff]/50 bg-[#131d2d] text-[#e6eef9]"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
+            <Button variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700 bg-transparent">
+              <Download className="w-4 h-4 mr-2" />
+              Export
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#8fa3bf] font-['Inter']">Final Balance</p>
-                    <p className="text-2xl font-bold text-[#e6eef9] font-['JetBrains_Mono']">
-                      {currencySymbol}
-                      {animatedValues.finalBalance.toLocaleString()}
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-[#2a7fff]" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#8fa3bf] font-['Inter']">Total Profit</p>
-                    <p className="text-2xl font-bold text-[#e6eef9] font-['JetBrains_Mono']">
-                      {currencySymbol}
-                      {animatedValues.totalProfit.toLocaleString()}
-                    </p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-[#2a7fff]" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#8fa3bf] font-['Inter']">ROI</p>
-                    <p className="text-2xl font-bold text-[#e6eef9] font-['JetBrains_Mono']">
-                      {animatedValues.roi.toFixed(2)}%
-                    </p>
-                  </div>
-                  <Target className="h-8 w-8 text-[#2a7fff]" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#8fa3bf] font-['Inter']">Win Rate</p>
-                    <p className="text-2xl font-bold text-[#e6eef9] font-['JetBrains_Mono']">
-                      {animatedValues.winRate.toFixed(1)}%
-                    </p>
-                  </div>
-                  <BarChart3 className="h-8 w-8 text-[#2a7fff]" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                <Calendar className="h-5 w-5 text-[#2a7fff]" />
-                Configuration Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 border-cyan-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Initial Capital</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                  <p className="text-xs text-gray-400 mb-1">Initial Capital</p>
+                  <p className="text-xl font-bold text-white">
                     {currencySymbol}
                     {fxData.initialCapital.toLocaleString()}
                   </p>
                 </div>
+                <DollarSign className="w-8 h-8 text-cyan-500 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Target Profit</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
+                  <p className="text-xs text-gray-400 mb-1">Final Balance</p>
+                  <p className="text-xl font-bold text-emerald-400">
                     {currencySymbol}
-                    {fxData.targetProfit.toLocaleString()}
+                    {animatedValues.finalBalance.toLocaleString()}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Risk Percentage</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                    {fxData.riskPercentage}%
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Trading Days</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                    {fxData.tradingDays} days
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Interest Type</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                    {fxData.interestType || "low"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Interest Rate</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                    {fxData.interestRate}% {fxData.interestType === "custom" ? "(Custom)" : ""}
-                  </p>
-                </div>
-                {/* Display stop loss configuration */}
-                <div>
-                  <p className="text-sm text-[#8fa3bf] font-['Inter']">Enable Stop Loss</p>
-                  <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                    {fxData.enableStopLoss ? "Yes" : "No"}
-                  </p>
-                </div>
-                {fxData.enableStopLoss && (
-                  <>
-                    <div>
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Type</p>
-                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {fxData.stopLossType || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Stop Loss Value</p>
-                      <p className="text-lg font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {fxData.stopLossType === "percentage"
-                          ? `${fxData.stopLossValue}%`
-                          : `${currencySymbol}${fxData.stopLossValue?.toLocaleString()}`}
-                      </p>
-                    </div>
-                  </>
-                )}
+                <TrendingUp className="w-8 h-8 text-emerald-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
 
-          <Collapsible open={expandedSections.performance} onOpenChange={() => toggleSection("performance")}>
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-[#0d1520]/50 transition-colors">
-                  <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                    <span className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-[#2a7fff]" />
-                      Performance Metrics
-                    </span>
-                    {expandedSections.performance ? (
-                      <ChevronUp className="h-5 w-5 text-[#8fa3bf]" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-[#8fa3bf]" />
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Total Trades</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {animatedValues.totalTrades.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Profit Factor</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {animatedValues.profitFactor.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Sharpe Ratio</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {animatedValues.sharpeRatio.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Max Drawdown</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {animatedValues.maxDrawdown.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Average Daily Profit</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {animatedValues.averageDailyProfit.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Percentage Profit</p>
-                      <p className="text-xl font-semibold text-green-400 font-['JetBrains_Mono']">
-                        {animatedValues.percentageProfit.toFixed(2)}%
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          {/* Daily Trade List Section */}
-          <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-[#2a7fff]" />
-                  Daily Trade List
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-[#2a7fff]/20">
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">Day</th>
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">Target Profit</th>
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">
-                          Trades Required
-                        </th>
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">Lot Size</th>
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">Pips Per Trade</th>
-                        <th className="text-left p-3 text-[#e6eef9] font-['Rajdhani'] font-semibold">Total Pips</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results?.trades.map((trade, index) => {
-                        const targetProfit = trade.dailyProfit
-
-                        // For small profits (< $50): 2-3 trades, smaller lots, more pips
-                        // For medium profits ($50-$200): 3-4 trades, medium lots, medium pips
-                        // For large profits (> $200): 4-5 trades, larger lots, fewer pips
-
-                        let tradesRequired: number
-                        let lotSize: number
-                        let pipsPerTrade: number
-
-                        if (targetProfit < 50) {
-                          // Small profit: fewer trades, smaller lots, more pips needed
-                          tradesRequired = Math.max(2, Math.ceil(targetProfit / 20))
-                          lotSize = Math.max(0.01, targetProfit / 100)
-                          pipsPerTrade = Math.ceil(targetProfit / (tradesRequired * lotSize * 10))
-                        } else if (targetProfit < 200) {
-                          // Medium profit: moderate trades and lots
-                          tradesRequired = Math.max(3, Math.ceil(targetProfit / 50))
-                          lotSize = Math.max(0.1, targetProfit / 500)
-                          pipsPerTrade = Math.ceil(targetProfit / (tradesRequired * lotSize * 10))
-                        } else {
-                          // Large profit: more trades, larger lots, fewer pips needed
-                          tradesRequired = Math.max(4, Math.ceil(targetProfit / 80))
-                          lotSize = Math.max(0.5, targetProfit / 800)
-                          pipsPerTrade = Math.ceil(targetProfit / (tradesRequired * lotSize * 10))
-                        }
-
-                        // Ensure reasonable limits
-                        tradesRequired = Math.min(tradesRequired, 8) // Max 8 trades per day
-                        lotSize = Math.min(lotSize, 10) // Max 10 lot size
-                        pipsPerTrade = Math.max(pipsPerTrade, 5) // Min 5 pips per trade
-                        pipsPerTrade = Math.min(pipsPerTrade, 100) // Max 100 pips per trade
-
-                        const totalPips = pipsPerTrade * tradesRequired
-
-                        return (
-                          <tr key={index} className="border-b border-[#2a7fff]/10 hover:bg-[#0d1520]/30">
-                            <td className="p-3 text-[#e6eef9] font-['Inter']">Day {trade.day}</td>
-                            <td className="p-3 text-green-400 font-['JetBrains_Mono']">
-                              {currencySymbol}
-                              {targetProfit.toFixed(2)}
-                            </td>
-                            <td className="p-3 text-[#2a7fff] font-['JetBrains_Mono']">{tradesRequired}</td>
-                            <td className="p-3 text-[#e6eef9] font-['JetBrains_Mono']">{lotSize.toFixed(2)}</td>
-                            <td className="p-3 text-[#e6eef9] font-['JetBrains_Mono']">{pipsPerTrade} pips</td>
-                            <td className="p-3 text-[#2a7fff] font-['JetBrains_Mono']">{totalPips} pips</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+          <Card className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-purple-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Net Profit</p>
+                  <p className="text-xl font-bold text-purple-400">
+                    {currencySymbol}
+                    {animatedValues.totalProfit.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-emerald-400">+{animatedValues.percentageProfit.toFixed(2)}%</p>
                 </div>
-
-                <div className="mt-4 p-4 bg-[#0d1520] rounded-xl border border-[#2a7fff]/20">
-                  <h4 className="text-[#e6eef9] font-['Rajdhani'] font-semibold mb-2">Trading Strategy Summary</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-[#8fa3bf] font-['Inter']">• Adjust trades per day based on profit target</p>
-                      <p className="text-[#8fa3bf] font-['Inter']">• Scale lot sizes with profit amounts</p>
-                    </div>
-                    <div>
-                      <p className="text-[#8fa3bf] font-['Inter']">• Optimize pips per trade for efficiency</p>
-                      <p className="text-[#8fa3bf] font-['Inter']">• Balance risk with profit targets</p>
-                    </div>
-                  </div>
-                </div>
+                <Target className="w-8 h-8 text-purple-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
 
-          <Collapsible open={expandedSections.risk} onOpenChange={() => toggleSection("risk")}>
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-[#0d1520]/50 transition-colors">
-                  <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                    <span className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-[#2a7fff]" />
-                      Risk Metrics
-                    </span>
-                    {expandedSections.risk ? (
-                      <ChevronUp className="h-5 w-5 text-[#8fa3bf]" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-[#8fa3bf]" />
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Max Drawdown</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {animatedValues.maxDrawdown.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Volatility</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.volatility.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Sortino Ratio</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.sortinoRatio.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Calmar Ratio</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.calmarRatio.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Ulcer Index</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.ulcerIndex.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Sterling Ratio</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.sterlingRatio.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible open={expandedSections.trading} onOpenChange={() => toggleSection("trading")}>
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-[#0d1520]/50 transition-colors">
-                  <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                    <span className="flex items-center gap-2">
-                      <ArrowUpRight className="h-5 w-5 text-[#2a7fff]" />
-                      Trading Metrics
-                    </span>
-                    {expandedSections.trading ? (
-                      <ChevronUp className="h-5 w-5 text-[#8fa3bf]" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-[#8fa3bf]" />
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Total Trades</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {animatedValues.totalTrades.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Profitable Days</p>
-                      <p className="text-xl font-semibold text-green-400 font-['JetBrains_Mono']">
-                        {results.summary.profitableDays.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Losing Days</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {results.summary.losingDays.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Break Even Days</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.breakEvenDays.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Average Trades Per Day</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.averageTradesPerDay.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Win Rate</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {animatedValues.winRate.toFixed(1)}%
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Collapsible open={expandedSections.advanced} onOpenChange={() => toggleSection("advanced")}>
-            <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-[#0d1520]/50 transition-colors">
-                  <CardTitle className="flex items-center gap-2 text-[#e6eef9] font-['Rajdhani']">
-                    <span className="flex items-center gap-2">
-                      <ArrowDownRight className="h-5 w-5 text-[#2a7fff]" />
-                      Advanced Metrics
-                    </span>
-                    {expandedSections.advanced ? (
-                      <ChevronUp className="h-5 w-5 text-[#8fa3bf]" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-[#8fa3bf]" />
-                    )}
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Kelly Criterion</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.kelly.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Expectancy</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.expectancy.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Win Loss Ratio</p>
-                      <p className="text-xl font-semibold text-[#e6eef9] font-['JetBrains_Mono']">
-                        {results.summary.winLossRatio.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Profit Per Trade</p>
-                      <p className="text-xl font-semibold text-green-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.profitPerTrade.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Loss Per Trade</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.lossPerTrade.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Largest Win</p>
-                      <p className="text-xl font-semibold text-green-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.largestWin.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Largest Loss</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.largestLoss.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Average Win</p>
-                      <p className="text-xl font-semibold text-green-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.averageWin.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-sm text-[#8fa3bf] font-['Inter']">Average Loss</p>
-                      <p className="text-xl font-semibold text-red-400 font-['JetBrains_Mono']">
-                        {currencySymbol}
-                        {results.summary.averageLoss.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          <Card className="bg-[#131d2d] border-[#2a7fff]/30 rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-[#e6eef9] font-['Rajdhani']">Comprehensive Trading Breakdown</CardTitle>
-              <div className="bg-[#0d1520] p-2 rounded-lg w-fit border border-[#2a7fff]/20">
-                <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)}>
-                  <TabsList className="grid w-full grid-cols-3 bg-[#131d2d] rounded-md p-1 gap-1 border border-[#2a7fff]/20">
-                    <TabsTrigger
-                      value="daily"
-                      className="text-xs sm:text-sm px-2 sm:px-4 py-2 rounded data-[state=active]:bg-[#2a7fff] data-[state=active]:text-white text-[#8fa3bf] hover:text-[#e6eef9] transition-all font-['Inter']"
-                    >
-                      Daily View
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="weekly"
-                      className="text-xs sm:text-sm px-2 sm:px-4 py-2 rounded data-[state=active]:bg-[#2a7fff] data-[state=active]:text-white text-[#8fa3bf] hover:text-[#e6eef9] transition-all font-['Inter']"
-                    >
-                      Weekly Summary
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="monthly"
-                      className="text-xs sm:text-sm px-2 sm:px-4 py-2 rounded data-[state=active]:bg-[#2a7fff] data-[state=active]:text-white text-[#8fa3bf] hover:text-[#e6eef9] transition-all font-['Inter']"
-                    >
-                      Monthly Summary
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#2a7fff]/20">
-                      <th
-                        className="text-left p-2 cursor-pointer hover:bg-[#0d1520]/50 text-[#e6eef9] font-['Rajdhani']"
-                        onClick={() => handleSort("period")}
-                      >
-                        Period {sortColumn === "period" && (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className="text-left p-2 cursor-pointer hover:bg-[#0d1520]/50 text-[#e6eef9] font-['Rajdhani']"
-                        onClick={() => handleSort("dailyProfit")}
-                      >
-                        Profit {sortColumn === "dailyProfit" && (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className="text-left p-2 cursor-pointer hover:bg-[#0d1520]/50 text-[#e6eef9] font-['Rajdhani']"
-                        onClick={() => handleSort("balance")}
-                      >
-                        Balance {sortColumn === "balance" && (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedData.map((row, index) => (
-                      <tr key={index} className="border-b border-[#2a7fff]/10 hover:bg-[#0d1520]/30">
-                        <td className="p-2 text-[#e6eef9] font-['Inter']">{row.period}</td>
-                        <td className="p-2">
-                          <span
-                            className={`font-['JetBrains_Mono'] ${row.dailyProfit >= 0 ? "text-green-400" : "text-red-400"}`}
-                          >
-                            {row.dailyProfit >= 0 ? (
-                              <ArrowUpRight className="inline h-4 w-4" />
-                            ) : (
-                              <ArrowDownRight className="inline h-4 w-4" />
-                            )}
-                            {currencySymbol}
-                            {Math.abs(row.dailyProfit).toFixed(2)}
-                          </span>
-                        </td>
-                        <td className="p-2 text-[#e6eef9] font-['JetBrains_Mono']">
-                          {currencySymbol}
-                          {row.balance.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-6 text-center">
-                <Button
-                  onClick={handleCreateSheet}
-                  className="bg-[#00d395] hover:bg-[#00d395]/80 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 font-['Rajdhani']"
-                >
-                  Create Sheet
-                </Button>
+          <Card className="bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-amber-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Trading Days</p>
+                  <p className="text-xl font-bold text-amber-400">{fxData.tradingDays}</p>
+                </div>
+                <Calendar className="w-8 h-8 text-amber-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
         </div>
-      </main>
+
+        {/* Configuration Summary */}
+        <Card className="bg-slate-800/50 border-slate-700/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-white text-lg">Configuration Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400">Currency</p>
+                <p className="text-white font-medium">{fxData.currency}</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Risk %</p>
+                <p className="text-white font-medium">{fxData.riskPercentage}%</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Win Rate</p>
+                <p className="text-white font-medium">{fxData.winRate}%</p>
+              </div>
+              <div>
+                <p className="text-gray-400">Risk:Reward</p>
+                <p className="text-white font-medium">1:{fxData.riskRewardRatio}</p>
+              </div>
+              {fxData.enableStopLoss && fxData.stopLossValue && (
+                <div>
+                  <p className="text-gray-400">Stop Loss</p>
+                  <p className="text-white font-medium">
+                    {fxData.stopLossType === "percentage"
+                      ? `${fxData.stopLossValue}%`
+                      : `${currencySymbol}${fxData.stopLossValue}`}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Performance Metrics */}
+        <Collapsible open={expandedSections.performance} onOpenChange={() => toggleSection("performance")}>
+          <Card className="bg-slate-800/50 border-slate-700/50">
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-white text-lg flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-cyan-500" />
+                  Performance Metrics
+                </CardTitle>
+                {expandedSections.performance ? (
+                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                )}
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">ROI</p>
+                    <p className="text-lg font-bold text-emerald-400">{animatedValues.roi.toFixed(2)}%</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Win Rate</p>
+                    <p className="text-lg font-bold text-cyan-400">{animatedValues.winRate.toFixed(2)}%</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Max Drawdown</p>
+                    <p className="text-lg font-bold text-red-400">{animatedValues.maxDrawdown.toFixed(2)}%</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Profit Factor</p>
+                    <p className="text-lg font-bold text-purple-400">{animatedValues.profitFactor.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Total Trades</p>
+                    <p className="text-lg font-bold text-white">{animatedValues.totalTrades}</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Avg Daily Profit</p>
+                    <p className="text-lg font-bold text-emerald-400">
+                      {currencySymbol}
+                      {animatedValues.averageDailyProfit.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Profitable Days</p>
+                    <p className="text-lg font-bold text-emerald-400">{results.summary.profitableDays}</p>
+                  </div>
+                  <div className="bg-slate-700/30 rounded-lg p-3">
+                    <p className="text-xs text-gray-400">Losing Days</p>
+                    <p className="text-lg font-bold text-red-400">{results.summary.losingDays}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Trade Details Table */}
+        <Card className="bg-slate-800/50 border-slate-700/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white text-lg">Trade Details</CardTitle>
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
+                <TabsList className="bg-slate-700/50">
+                  <TabsTrigger value="daily" className="text-xs">
+                    Daily
+                  </TabsTrigger>
+                  <TabsTrigger value="weekly" className="text-xs">
+                    Weekly
+                  </TabsTrigger>
+                  <TabsTrigger value="monthly" className="text-xs">
+                    Monthly
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    <th
+                      className="text-left py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("day")}
+                    >
+                      {viewMode === "daily" ? "Day" : viewMode === "weekly" ? "Week" : "Month"}
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("trades")}
+                    >
+                      Trades
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("wins")}
+                    >
+                      Wins
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("losses")}
+                    >
+                      Losses
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("dailyProfit")}
+                    >
+                      P/L
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("balance")}
+                    >
+                      Balance
+                    </th>
+                    <th
+                      className="text-right py-2 px-2 text-gray-400 cursor-pointer hover:text-white"
+                      onClick={() => handleSort("winRate")}
+                    >
+                      Win %
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewData.map((trade, index) => (
+                    <tr key={index} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                      <td className="py-2 px-2 text-white">{viewMode === "daily" ? `Day ${trade.day}` : trade.date}</td>
+                      <td className="py-2 px-2 text-right text-white">{trade.trades}</td>
+                      <td className="py-2 px-2 text-right text-emerald-400">{trade.wins}</td>
+                      <td className="py-2 px-2 text-right text-red-400">{trade.losses}</td>
+                      <td
+                        className={`py-2 px-2 text-right ${trade.dailyProfit >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                      >
+                        <span className="flex items-center justify-end gap-1">
+                          {trade.dailyProfit >= 0 ? (
+                            <ArrowUpRight className="w-3 h-3" />
+                          ) : (
+                            <ArrowDownRight className="w-3 h-3" />
+                          )}
+                          {currencySymbol}
+                          {Math.abs(trade.dailyProfit).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-right text-white">
+                        {currencySymbol}
+                        {trade.balance.toFixed(2)}
+                      </td>
+                      <td className="py-2 px-2 text-right text-cyan-400">{trade.winRate.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Create Sheet Button */}
+        <div className="flex justify-center">
+          <Button
+            onClick={handleCreateSheet}
+            className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white px-8 py-3"
+          >
+            Create Sheet
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
