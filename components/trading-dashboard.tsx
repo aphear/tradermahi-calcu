@@ -708,7 +708,7 @@ export default function TradingDashboard({ onLogout, currentLanguage, onLanguage
                 className="max-w-xs h-8 text-sm font-medium bg-gradient-to-r from-blue-500/20 to-purple-500/20 hover:from-blue-500/30 hover:to-purple-500/30 border-primary/50 hover:border-primary shadow-md hover:shadow-lg transition-all duration-300 animate-pulse px-4"
                 onClick={() => {
                   if (calculatorResults) {
-                    setActiveTab("results")
+                    router.push("/binary-money-management-result")
                   } else {
                     toast({
                       title: t.noResultsAvailable,

@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app"
-import { getDatabase, ref, set, get, remove, onValue, off } from "firebase/database"
+import { initializeApp, getApps, getApp } from "firebase/app"
+import { getDatabase, ref, set, get, remove, onValue, off, Database } from "firebase/database"
 
 const firebaseConfig = {
   apiKey: "AIzaSyCisBYc9s_pjEFclbJomB_MxXg7jf9T_EA",
@@ -11,16 +11,23 @@ const firebaseConfig = {
   appId: "1:49641339694:web:8510fd06e3f5723dd818bf",
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-const database = getDatabase(app)
+// Initialize Firebase lazily
+let database: Database | null = null
+
+function getDb(): Database {
+  if (!database) {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+    database = getDatabase(app)
+  }
+  return database
+}
 
 // Firebase utility functions
 export const firebaseUtils = {
   // Activation key validation
   async validateActivationKey(key: string, username: string) {
     try {
-      const keyRef = ref(database, `activationKeys/${key}`)
+      const keyRef = ref(getDb(), `activationKeys/${key}`)
       const snapshot = await get(keyRef)
 
       if (!snapshot.exists()) {
@@ -40,7 +47,7 @@ export const firebaseUtils = {
       }
 
       // Check if user is banned
-      const userRef = ref(database, `users/${username}`)
+      const userRef = ref(getDb(), `users/${username}`)
       const userSnapshot = await get(userRef)
       if (userSnapshot.exists() && userSnapshot.val().banned) {
         return { valid: false, error: "User is banned", banned: true }
@@ -48,13 +55,13 @@ export const firebaseUtils = {
 
       // Mark key as used if one-time
       if (keyData.type === "one-time") {
-        await set(ref(database, `activationKeys/${key}/used`), true)
-        await set(ref(database, `activationKeys/${key}/usedBy`), username)
-        await set(ref(database, `activationKeys/${key}/usedAt`), new Date().toISOString())
+        await set(ref(getDb(), `activationKeys/${key}/used`), true)
+        await set(ref(getDb(), `activationKeys/${key}/usedBy`), username)
+        await set(ref(getDb(), `activationKeys/${key}/usedAt`), new Date().toISOString())
       }
 
       // Create/update user record
-      await set(ref(database, `users/${username}`), {
+      await set(ref(getDb(), `users/${username}`), {
         activationKey: key,
         lastLogin: new Date().toISOString(),
         banned: false,
@@ -86,7 +93,7 @@ export const firebaseUtils = {
 
       console.log("[v0] Attempting to write key data:", keyData)
 
-      const keyRef = ref(database, `activationKeys/${key}`)
+      const keyRef = ref(getDb(), `activationKeys/${key}`)
       await set(keyRef, keyData)
 
       console.log("[v0] Successfully generated key:", key)
@@ -100,7 +107,7 @@ export const firebaseUtils = {
   async getAllUsers() {
     try {
       console.log("[v0] Fetching all users...")
-      const snapshot = await get(ref(database, "users"))
+      const snapshot = await get(ref(getDb(), "users"))
       const users = snapshot.exists() ? snapshot.val() : {}
       console.log("[v0] Fetched users:", Object.keys(users).length, "users")
       return users
@@ -113,7 +120,7 @@ export const firebaseUtils = {
   async getAllKeys() {
     try {
       console.log("[v0] Fetching all keys...")
-      const snapshot = await get(ref(database, "activationKeys"))
+      const snapshot = await get(ref(getDb(), "activationKeys"))
       const keys = snapshot.exists() ? snapshot.val() : {}
       console.log("[v0] Fetched keys:", Object.keys(keys).length, "keys")
       return keys
@@ -124,24 +131,24 @@ export const firebaseUtils = {
   },
 
   async banUser(username: string) {
-    await set(ref(database, `users/${username}/banned`), true)
+    await set(ref(getDb(), `users/${username}/banned`), true)
   },
 
   async unbanUser(username: string) {
-    await set(ref(database, `users/${username}/banned`), false)
+    await set(ref(getDb(), `users/${username}/banned`), false)
   },
 
   async deleteUser(username: string) {
-    await remove(ref(database, `users/${username}`))
+    await remove(ref(getDb(), `users/${username}`))
   },
 
   async deleteKey(key: string) {
-    await remove(ref(database, `activationKeys/${key}`))
+    await remove(ref(getDb(), `activationKeys/${key}`))
   },
 
   // Real-time listeners
   onUsersChange(callback: (users: any) => void) {
-    const usersRef = ref(database, "users")
+    const usersRef = ref(getDb(), "users")
     onValue(usersRef, (snapshot) => {
       callback(snapshot.exists() ? snapshot.val() : {})
     })
@@ -149,7 +156,7 @@ export const firebaseUtils = {
   },
 
   onKeysChange(callback: (keys: any) => void) {
-    const keysRef = ref(database, "activationKeys")
+    const keysRef = ref(getDb(), "activationKeys")
     onValue(keysRef, (snapshot) => {
       callback(snapshot.exists() ? snapshot.val() : {})
     })
@@ -157,4 +164,4 @@ export const firebaseUtils = {
   },
 }
 
-export { database }
+export { getDb as database }
